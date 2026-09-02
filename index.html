@@ -312,9 +312,11 @@ function aiAssessPhoto(itemDesc,photoDataUrl,refPhoto,cb){
     if(data.error) throw new Error(data.error);
     cb({result:data.result==='ok'?'ok':'nok',note:data.note||'-',ts:data.ts||Date.now()});
   }).catch(function(e){
+    // Tampilkan alasan ASLI kenapa AI gagal (bukan pesan generik) supaya gampang di-debug.
+    var realMsg=(e&&e.message)?e.message:'Tidak diketahui';
     console.error('Gagal menilai foto dengan AI:', e);
-    if(typeof toast==='function') toast('AI gagal menilai foto, coba lagi.','error');
-    cb({result:'nok',note:'Gagal terhubung ke AI, mohon cek koneksi dan coba upload ulang.',ts:Date.now()});
+    if(typeof toast==='function') toast('AI gagal menilai foto: '+realMsg,'error');
+    cb({result:'nok',note:'AI gagal menilai (bukan hasil audit): '+realMsg,ts:Date.now()});
   });
 }
 function pen_getRecord(){return DB.get('penilaian').find(function(p){return p.areaId===_ipA&&p.date===_ipD&&p.shift===_ipS});}
@@ -322,6 +324,11 @@ function pen_getItems(cls,existing){return cls.map(function(c){var it=existing?e
 function pen_saveItems(items,cb){var list=DB.get('penilaian').filter(function(p){return !(p.areaId===_ipA&&p.date===_ipD&&p.shift===_ipS)});list.push({id:DB.uid(),areaId:_ipA,date:_ipD,shift:_ipS,items:items,submittedBy:CU.id,ts:Date.now()});DB.set('penilaian',list,cb);}
 function onPickPhoto(inputEl,clId,role){
   var file=inputEl.files[0];if(!file)return;
+  var existingChk=pen_getRecord();
+  var itChk=existingChk?existingChk.items.find(function(i){return i.clId===clId;}):null;
+  if(role==='spv' && itChk && itChk.spvPhoto && (CU.role==='spv'||CU.role==='pengawas')){
+    toast('Foto SPV hari ini sudah terkunci, tidak bisa diganti.','error');inputEl.value='';return;
+  }
   var cell=inputEl.closest('.photo-cell');if(cell)cell.classList.add('photo-loading');
   compressPhoto(file,function(dataUrl){
     var cls=DB.get('checklists').filter(function(c){return c.areaId===_ipA});
@@ -808,12 +815,18 @@ function pen_renderPhotoCell(it,role,editable,oddCls){
   var photo=role==='pic'?it.picPhoto:it.spvPhoto;
   var ai=role==='pic'?it.picAi:it.spvAi;
   var label=role==='pic'?'Pelaksana':'SPV';
+  // SPV & Pengawas tidak boleh upload ulang/ganti foto verifikasi setelah tersimpan hari itu
+  // (supaya tidak bisa "coba-coba" ganti foto sampai lolos AI). Pelaksana tetap boleh
+  // mengambil ulang foto karena tugasnya memang memperbaiki area lalu memfoto ulang.
+  // Admin tetap bisa mengoreksi jika terjadi kesalahan input.
+  var lockedForRole=(role==='spv' && (CU.role==='spv' || CU.role==='pengawas'));
   var html='<div class="chk-cell'+oddCls+' photo-cell" data-label="'+label+'">';
   if(photo){
     html+='<img src="'+photo+'" class="photo-thumb" onclick="window.open(this.src,\'_blank\')">';
     if(ai)html+='<span class="ai-badge '+(ai.result==='ok'?'ai-badge-ok':'ai-badge-nok')+'" title="'+String(ai.note||'').replace(/"/g,'&quot;')+'"><i class="fas '+(ai.result==='ok'?'fa-check':'fa-xmark')+'"></i>'+(ai.result==='ok'?'OK':'NOK')+'</span>';
     else html+='<span class="ai-badge ai-badge-pending"><i class="fas fa-spinner fa-spin"></i>Menilai...</span>';
-    if(editable)html+='<label class="photo-retake"><i class="fas fa-camera-rotate"></i>Ganti Foto<input type="file" accept="image/*" capture="environment" style="display:none" onchange="onPickPhoto(this,\''+it.clId+'\',\''+role+'\')"></label>';
+    if(editable && !lockedForRole)html+='<label class="photo-retake"><i class="fas fa-camera-rotate"></i>Ganti Foto<input type="file" accept="image/*" capture="environment" style="display:none" onchange="onPickPhoto(this,\''+it.clId+'\',\''+role+'\')"></label>';
+    else if(editable && lockedForRole)html+='<span style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:4px;margin-top:3px"><i class="fas fa-lock"></i>Foto hari ini terkunci</span>';
   }else if(editable){
     html+='<label class="photo-upload-btn"><i class="fas fa-camera"></i>Ambil/Upload Foto<input type="file" accept="image/*" capture="environment" style="display:none" onchange="onPickPhoto(this,\''+it.clId+'\',\''+role+'\')"></label>';
   }else{
