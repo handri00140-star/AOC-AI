@@ -277,17 +277,24 @@ function compressPhoto(file,cb){
   };
   reader.readAsDataURL(file);
 }
-// TODO(CONNECT-AI): Ganti isi fungsi ini dengan pemanggilan API AI Vision sungguhan
-// (mis. kirim photoDataUrl + refPhoto (foto standar dari master checksheet) + itemDesc
-// ke endpoint backend yang meneruskan ke model vision untuk dibandingkan),
-// lalu kembalikan cb({result:'ok'|'nok', note:'alasan singkat dari AI', ts:Date.now()}).
-// Untuk sekarang masih SIMULASI supaya alur UI bisa langsung dites.
+// AI Vision beneran: manggil Supabase Edge Function 'assess-photo' yang meneruskan ke Gemini
+var AI_FUNCTION_URL = SUPABASE_URL + '/functions/v1/assess-photo';
 function aiAssessPhoto(itemDesc,photoDataUrl,refPhoto,cb){
-  setTimeout(function(){
-    var ok=Math.random()<0.8;
-    var note=ok?'Simulasi AI: foto terlihat sesuai standar 5R untuk item "'+itemDesc+'".':'Simulasi AI: foto terindikasi belum sesuai standar untuk item "'+itemDesc+'".';
-    cb({result:ok?'ok':'nok',note:note,ts:Date.now()});
-  },600);
+  fetch(AI_FUNCTION_URL,{
+    method:'POST',
+    headers:sbHeaders(),
+    body:JSON.stringify({itemDesc:itemDesc,photoBase64:photoDataUrl,refPhotoBase64:refPhoto||null})
+  }).then(function(r){
+    if(!r.ok) return r.text().then(function(t){ throw new Error('HTTP '+r.status+': '+t); });
+    return r.json();
+  }).then(function(data){
+    if(data.error) throw new Error(data.error);
+    cb({result:data.result==='ok'?'ok':'nok',note:data.note||'-',ts:data.ts||Date.now()});
+  }).catch(function(e){
+    console.error('Gagal menilai foto dengan AI:', e);
+    if(typeof toast==='function') toast('AI gagal menilai foto, coba lagi.','error');
+    cb({result:'nok',note:'Gagal terhubung ke AI, mohon cek koneksi dan coba upload ulang.',ts:Date.now()});
+  });
 }
 function pen_getRecord(){return DB.get('penilaian').find(function(p){return p.areaId===_ipA&&p.date===_ipD&&p.shift===_ipS});}
 function pen_getItems(cls,existing){return cls.map(function(c){var it=existing?existing.items.find(function(i){return i.clId===c.id}):null;return it||{clId:c.id,picPhoto:null,picAi:null,spvPhoto:null,spvAi:null,pwStatus:'pending'};});}
