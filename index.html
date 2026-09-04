@@ -223,6 +223,18 @@ var DB = {
   set: function(k, v, cb){ _cache[k] = v; _flushSave(k, cb); },
   uid: function(){ return 'u'+Date.now().toString(36)+Math.random().toString(36).substr(2,5); }
 };
+// --- Penyimpanan Penilaian 5R: SATU KEY PER RECORD (Area+Tanggal+Shift) ---
+// Sebelumnya seluruh data penilaian (semua area/tanggal/shift) disimpan sebagai SATU
+// array besar dalam SATU key 'penilaian', dan SETIAP perubahan (1 foto saja) menulis
+// ulang SELURUH array itu ke server. Ini menyebabkan race condition: kalau 2 device/akun
+// menyimpan hampir bersamaan, yang belakangan menimpa balik seluruh data dengan versi
+// lamanya (data dari device lain ikut hilang, termasuk foto yang baru diupload).
+// Sekarang tiap record disimpan di key sendiri (mis. 'penilaian:a1:2026-09-01:pagi'),
+// jadi upload di kombinasi Area+Tanggal+Shift lain tidak akan pernah saling menimpa.
+var PEN_PREFIX='penilaian:';
+function penKey(areaId,date,shift){ return PEN_PREFIX+areaId+':'+date+':'+shift; }
+function penGetRecord(areaId,date,shift){ var v=_cache[penKey(areaId,date,shift)]; return (v&&v.items)?v:null; }
+function getAllPenilaian(){ var out=[]; for(var k in _cache){ if(k.indexOf(PEN_PREFIX)===0 && _cache[k] && _cache[k].items) out.push(_cache[k]); } return out; }
 function loadAllDataFromServer(cb){
   fetch(SUPABASE_URL + '/rest/v1/kv_store?select=key,value', { headers: sbHeaders() })
     .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
@@ -241,7 +253,7 @@ function loadAllDataFromServer(cb){
 var BULAN=['Januari','Februari','Maret','April','Mei','Juni','Juli','Agustus','September','Oktober','November','Desember'];
 var CAT5R=['Ringkas','Rapi','Resik','Rawat','Rajin'];
 function detectPatterns(){
-  var pen=DB.get('penilaian');var areas=DB.get('areas');var cls=DB.get('checklists');
+  var pen=getAllPenilaian();var areas=DB.get('areas');var cls=DB.get('checklists');
   var areaMap={};areas.forEach(function(a){areaMap[a.id]=a;});
   var clMap={};cls.forEach(function(c){clMap[c.id]=c;});
   var counter={};
@@ -319,13 +331,16 @@ function aiAssessPhoto(itemDesc,photoDataUrl,refPhoto,cb){
     cb({result:'nok',note:'AI gagal menilai (bukan hasil audit): '+realMsg,ts:Date.now()});
   });
 }
-function pen_getRecord(){return DB.get('penilaian').find(function(p){return p.areaId===_ipA&&p.date===_ipD&&p.shift===_ipS});}
+function pen_getRecord(){return penGetRecord(_ipA,_ipD,_ipS);}
 function pen_getItems(cls,existing){return cls.map(function(c){var it=existing?existing.items.find(function(i){return i.clId===c.id}):null;return it||{clId:c.id,picPhoto:null,picAi:null,spvPhoto:null,spvAi:null,pwStatus:'pending'};});}
-function pen_saveItems(items,cb){var list=DB.get('penilaian').filter(function(p){return !(p.areaId===_ipA&&p.date===_ipD&&p.shift===_ipS)});list.push({id:DB.uid(),areaId:_ipA,date:_ipD,shift:_ipS,items:items,submittedBy:CU.id,ts:Date.now()});DB.set('penilaian',list,cb);}
+function pen_saveItems(items,cb){var rec={id:DB.uid(),areaId:_ipA,date:_ipD,shift:_ipS,items:items,submittedBy:CU.id,ts:Date.now()};DB.set(penKey(_ipA,_ipD,_ipS),rec,cb);}
 function onPickPhoto(inputEl,clId,role){
   var file=inputEl.files[0];if(!file)return;
   var existingChk=pen_getRecord();
   var itChk=existingChk?existingChk.items.find(function(i){return i.clId===clId;}):null;
+  if(role==='pic' && itChk && itChk.picPhoto && CU.role==='pelaksana'){
+    toast('Foto Pelaksana hari ini sudah terkunci, tidak bisa diganti.','error');inputEl.value='';return;
+  }
   if(role==='spv' && itChk && itChk.spvPhoto && (CU.role==='spv'||CU.role==='pengawas')){
     toast('Foto SPV hari ini sudah terkunci, tidak bisa diganti.','error');inputEl.value='';return;
   }
@@ -344,7 +359,7 @@ function onPickPhoto(inputEl,clId,role){
       var rec=pen_getRecord();if(!rec)return;
       var it2=rec.items.find(function(i){return i.clId===clId});if(!it2)return;
       if(role==='pic')it2.picAi=aiRes;else it2.spvAi=aiRes;
-      DB.set('penilaian',DB.get('penilaian'));
+      DB.set(penKey(rec.areaId,rec.date,rec.shift),rec);
       toast('AI menilai foto: '+(aiRes.result==='ok'?'Sesuai standar':'Tidak sesuai standar'),aiRes.result==='ok'?'success':'error');
       if(curPage==='input-penilaian')pgInputPen();
     });
@@ -354,7 +369,7 @@ function approveItem(clId){
   var rec=pen_getRecord();if(!rec)return;
   var it=rec.items.find(function(i){return i.clId===clId});if(!it||!it.picAi||!it.spvAi)return;
   it.pwStatus='approved';it.pwApprovedBy=CU.name;it.pwApprovedAt=Date.now();
-  DB.set('penilaian',DB.get('penilaian'),function(ok){if(ok){toast('Item disetujui');logAct('Approve item penilaian '+_ipD+' shift '+_ipS);}});
+  DB.set(penKey(rec.areaId,rec.date,rec.shift),rec,function(ok){if(ok){toast('Item disetujui');logAct('Approve item penilaian '+_ipD+' shift '+_ipS);}});
   pgInputPen();
 }
 function ensureAdmin(){var users=DB.get('users');var found=false;for(var i=0;i<users.length;i++){if(users[i].username==='admin'){found=true;break;}}if(!found){users.push({id:'admin_default',name:'Administrator',username:'admin',password:'admin123',dept:'GM',role:'admin',areas:[],ts:Date.now()});DB.set('users',users);}}
@@ -397,7 +412,8 @@ function seedFromLogin(){
   var SEED_PHOTO='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
   var pen=[];
   areas.forEach(function(a){var aCls=cls.filter(function(c){return c.areaId===a.id});['pagi','siang'].forEach(function(shift){var items=aCls.map(function(cl,i){var okPic=(i%5!==3);var okSpv=(i%7!==5);return{clId:cl.id,picPhoto:SEED_PHOTO,picAi:{result:okPic?'ok':'nok',note:'Data contoh',ts:1},spvPhoto:SEED_PHOTO,spvAi:{result:okSpv?'ok':'nok',note:'Data contoh',ts:1},pwStatus:(okPic&&okSpv)?'approved':'expired'};});pen.push({id:DB.uid(),areaId:a.id,date:todayStr(),shift:shift,items:items,submittedBy:'admin_default',ts:Date.now()});});});
-  DB.set('penilaian',pen);DB.set('inisiatif',[{id:DB.uid(),areaId:'a1',date:todayStr(),desc:'Menemukan kabel terkelupas di area Line B',reporter:'Andi Pratama',ts:1}]);
+  pen.forEach(function(rec){DB.set(penKey(rec.areaId,rec.date,rec.shift),rec);});
+  DB.set('inisiatif',[{id:DB.uid(),areaId:'a1',date:todayStr(),desc:'Menemukan kabel terkelupas di area Line B',reporter:'Andi Pratama',ts:1}]);
   DB.set('mystery',[{id:DB.uid(),areaId:'a3',date:todayStr(),desc:'Alat tidak tersimpan di tempatnya setelah jam kerja',ts:1}]);DB.set('pk_result',[]);
   DB.set('activities',[{id:DB.uid(),desc:'Data contoh dimuat',date:todayStr(),ts:1}]);doLoginDirect('admin','admin123');
 }
@@ -421,7 +437,7 @@ function refreshCU(){if(!CU)return;var fresh=DB.get('users').find(function(x){re
 function nav(pg){refreshCU();if(!canAccess(pg)){document.getElementById('content').innerHTML='<div class="no-access"><i class="fas fa-lock"></i><p>Anda tidak memiliki akses.</p></div>';return;}curPage=pg;document.querySelectorAll('.menu-item').forEach(function(m){m.classList.toggle('active',m.getAttribute('data-page')===pg)});document.getElementById('page-title').textContent=PAGE_TITLES[pg]||'';var fn={dashboard:pgDashboard,'app-settings':pgAppSettings,'master-area':pgMasterArea,'master-checksheet':pgMasterCheck,'master-user':pgMasterUser,'master-kantin':pgMasterKantin,'jadwal-piket':pgJadwalPiket,'jadwal-pengawas':pgJadwalPw,'tukar-jadwal':pgTukarJadwal,'input-penilaian':pgInputPen,'input-inisiatif':pgInputIni,'input-mystery':pgInputMys,'input-piket-kantin':pgInputPK,'rekap-bulanan':pgRekap,klasemen:pgKlasemen};if(fn[pg])fn[pg]();else document.getElementById('content').innerHTML='<div class="empty-state"><p>Halaman belum tersedia.</p></div>';document.getElementById('sidebar').classList.remove('open');}
 var _charts={};function mkChart(id,cfg){if(_charts[id]){_charts[id].destroy();delete _charts[id];}var el=document.getElementById(id);if(!el)return;_charts[id]=new Chart(el,cfg);}
 
-function calcScore(areaId,y,m){var area=DB.get('areas').find(function(a){return a.id===areaId});if(!area)return null;var cls=DB.get('checklists').filter(function(c){return c.areaId===areaId});var n=cls.length;if(n===0)return{base:0,initB:0,mysP:0,kantB:0,kantP:0,final:0,area:area};var ppi=100/n;var pen=DB.get('penilaian').filter(function(p){return p.areaId===areaId&&p.date.substring(0,7)===mPrefix(y,m)});var dates=allDates(y,m);var daily=[];dates.forEach(function(date){var shifts=[];['pagi','siang'].forEach(function(shift){var rec=pen.find(function(p){return p.date===date&&p.shift===shift});if(rec&&rec.items){var t=0;cls.forEach(function(cl){var it=rec.items.find(function(i){return i.clId===cl.id});if(it&&it.picAi&&it.picAi.result==='ok'&&it.spvAi&&it.spvAi.result==='ok'&&it.pwStatus!=='expired')t+=ppi;});shifts.push(t);}});if(shifts.length>0)daily.push(shifts.reduce(function(a,b){return a+b},0)/shifts.length);});var base=daily.length>0?daily.reduce(function(a,b){return a+b},0)/daily.length:0;var pf=mPrefix(y,m);var initB=DB.get('inisiatif').filter(function(i){return i.areaId===areaId&&i.date.substring(0,7)===pf}).length*25;var mysP=DB.get('mystery').filter(function(x){return x.areaId===areaId&&x.date.substring(0,7)===pf}).length*25;var ks=getKantinSettings();var kantB=0,kantP=0;DB.get('pk_result').forEach(function(r){if(r.date.substring(0,7)!==pf)return;var okVerif=ks.wajibVerifikasi?!!r.verified:true;if(!okVerif)return;var duty=getDuty(r.date,r.shift);if(duty!==areaId)return;if(r.clean)kantB+=ks.bonus;else kantP+=ks.penalty;});var fin=base+initB-mysP+kantB-kantP;if(area.type==='non-lomba'&&fin>100)fin=100;return{base:Math.round(base*100)/100,initB:initB,mysP:mysP,kantB:kantB,kantP:kantP,final:Math.round(fin*100)/100,area:area};}
+function calcScore(areaId,y,m){var area=DB.get('areas').find(function(a){return a.id===areaId});if(!area)return null;var cls=DB.get('checklists').filter(function(c){return c.areaId===areaId});var n=cls.length;if(n===0)return{base:0,initB:0,mysP:0,kantB:0,kantP:0,final:0,area:area};var ppi=100/n;var pen=getAllPenilaian().filter(function(p){return p.areaId===areaId&&p.date.substring(0,7)===mPrefix(y,m)});var dates=allDates(y,m);var daily=[];dates.forEach(function(date){var shifts=[];['pagi','siang'].forEach(function(shift){var rec=pen.find(function(p){return p.date===date&&p.shift===shift});if(rec&&rec.items){var t=0;cls.forEach(function(cl){var it=rec.items.find(function(i){return i.clId===cl.id});if(it&&it.picAi&&it.picAi.result==='ok'&&it.spvAi&&it.spvAi.result==='ok'&&it.pwStatus!=='expired')t+=ppi;});shifts.push(t);}});if(shifts.length>0)daily.push(shifts.reduce(function(a,b){return a+b},0)/shifts.length);});var base=daily.length>0?daily.reduce(function(a,b){return a+b},0)/daily.length:0;var pf=mPrefix(y,m);var initB=DB.get('inisiatif').filter(function(i){return i.areaId===areaId&&i.date.substring(0,7)===pf}).length*25;var mysP=DB.get('mystery').filter(function(x){return x.areaId===areaId&&x.date.substring(0,7)===pf}).length*25;var ks=getKantinSettings();var kantB=0,kantP=0;DB.get('pk_result').forEach(function(r){if(r.date.substring(0,7)!==pf)return;var okVerif=ks.wajibVerifikasi?!!r.verified:true;if(!okVerif)return;var duty=getDuty(r.date,r.shift);if(duty!==areaId)return;if(r.clean)kantB+=ks.bonus;else kantP+=ks.penalty;});var fin=base+initB-mysP+kantB-kantP;if(area.type==='non-lomba'&&fin>100)fin=100;return{base:Math.round(base*100)/100,initB:initB,mysP:mysP,kantB:kantB,kantP:kantP,final:Math.round(fin*100)/100,area:area};}
 function getDuty(date,shift){var s=DB.get('piket_kantin').find(function(p){return p.date===date&&p.shift===shift});return s?s.areaId:null;}
 function getPwForDate(dateStr){var ws=weekStart(dateStr);var s=DB.get('pw_schedule').find(function(x){return x.weekStart===ws});if(!s)return null;return DB.get('users').find(function(u){return u.id===s.pwId&&u.role==='pengawas'})||null;}
 
@@ -467,7 +483,7 @@ function applyBranding(){
   if(sideLogo)sideLogo.innerHTML='<div class="logo-icon">'+iconHtml+'</div><div class="logo-text">'+name+'<br><span>'+sub+'</span></div>';
   document.title=name+' - '+sub;
 }
-function pgDashboard(){var now=new Date(),y=now.getFullYear(),m=now.getMonth();var areas=DB.get('areas');var lomba=areas.filter(function(a){return a.type==='lomba'});var nonL=areas.filter(function(a){return a.type==='non-lomba'});var td=todayStr();var todayPen=DB.get('penilaian').filter(function(p){return p.date===td});var doneShifts={};todayPen.forEach(function(p){doneShifts[p.areaId+'_'+p.shift]=1;});var pct=areas.length>0?Math.round(Object.keys(doneShifts).length/(areas.length*2)*100):0;var scores=[];areas.forEach(function(a){var s=calcScore(a.id,y,m);if(s)scores.push(s);});scores.sort(function(a,b){return b.final-a.final});var top=scores[0];var acts=DB.get('activities').slice(-6).reverse();var h='';if(areas.length===0&&CU.role==='admin'){h+='<div class="seed-banner"><p><i class="fas fa-database" style="margin-right:5px"></i>Kosong. Muat data contoh.</p><button class="btn" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3)" onclick="seedFromLogin()"><i class="fas fa-flask"></i>Muat Data Contoh</button></div>';}h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px">';h+='<div class="stat-card"><div class="stat-icon" style="background:#dbeafe;color:#1d4ed8"><i class="fas fa-map-location-dot"></i></div><div><div class="stat-value">'+areas.length+'</div><div class="stat-label">Total Area</div></div></div>';h+='<div class="stat-card"><div class="stat-icon" style="background:#e0f2fe;color:#075985"><i class="fas fa-trophy"></i></div><div><div class="stat-value">'+lomba.length+'</div><div class="stat-label">Area Lomba</div></div></div>';h+='<div class="stat-card"><div class="stat-icon" style="background:#fef3c7;color:#92400e"><i class="fas fa-building"></i></div><div><div class="stat-value">'+nonL.length+'</div><div class="stat-label">Non-Lomba</div></div></div>';h+='<div class="stat-card"><div class="stat-icon" style="background:#ede9fe;color:#6d28d9"><i class="fas fa-chart-pie"></i></div><div><div class="stat-value">'+pct+'%</div><div class="stat-label">Hari Ini</div></div></div></div>';h+='<div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px"><div class="card"><div class="card-header"><div class="card-title">Skor Bulan Ini</div></div><canvas id="ch-d1" height="170"></canvas></div><div class="card"><div class="card-header"><div class="card-title">Komposisi</div></div><canvas id="ch-d2" height="170"></canvas></div></div>';h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div class="card"><div class="card-header"><div class="card-title">Top Performer</div></div>';if(top){h+='<div style="text-align:center;padding:6px 0"><div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#fbbf24);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:20px;margin-bottom:4px"><i class="fas fa-crown"></i></div><div style="font-weight:700;font-size:14px">'+top.area.name+'</div><div style="font-size:10px;color:var(--text-muted)">'+(top.area.type==='lomba'?'Lomba':'Non-Lomba')+'</div><div style="font-size:26px;font-weight:900;color:var(--primary)">'+top.final+'</div></div>';}else{h+='<div class="empty-state"><i class="fas fa-chart-line"></i><p>Belum ada data</p></div>';}h+='</div><div class="card"><div class="card-header"><div class="card-title">Aktivitas Terbaru</div></div>';if(acts.length>0){acts.forEach(function(a){h+='<div style="display:flex;align-items:start;gap:7px;padding:4px 0;border-bottom:1px solid #f1f5f9"><div style="width:5px;height:5px;border-radius:50%;background:var(--primary);margin-top:5px;flex-shrink:0"></div><div><div style="font-size:11px">'+a.desc+'</div><div style="font-size:9px;color:var(--text-muted)">'+fmtD(a.date)+'</div></div></div>';});}else{h+='<div class="empty-state"><i class="fas fa-clock-rotate-left"></i><p>Belum ada aktivitas</p></div>';}h+='</div></div>';var _patterns=detectPatterns().slice(0,5);if(_patterns.length>0){h+='<div class="card" style="margin-top:12px"><div class="card-header"><div class="card-title"><i class="fas fa-triangle-exclamation" style="color:var(--danger)"></i> Pola Bermasalah (Kronis)</div></div>';_patterns.forEach(function(p){h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9"><div><div style="font-weight:600;font-size:12px">'+p.area.name+'</div><div style="font-size:11px;color:var(--text-muted)">'+p.cl.desc+'</div></div><span class="badge badge-tidak">'+p.count+'x NOK</span></div>';});h+='</div>';}document.getElementById('content').innerHTML=h;if(scores.length>0){mkChart('ch-d1',{type:'bar',data:{labels:scores.map(function(s){return s.area.name}),datasets:[{label:'Dasar',data:scores.map(function(s){return s.base}),backgroundColor:'rgba(148,163,184,0.35)',borderRadius:3},{label:'Akhir',data:scores.map(function(s){return s.final}),backgroundColor:scores.map(function(s){return s.area.type==='lomba'?'rgba(37,99,235,0.75)':'rgba(245,158,11,0.7)'}),borderRadius:3}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},scales:{y:{beginAtZero:true}}}});mkChart('ch-d2',{type:'doughnut',data:{labels:['Lomba','Non-Lomba'],datasets:[{data:[lomba.length,nonL.length],backgroundColor:['#2563eb','#f59e0b'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},cutout:'60%'}});}}
+function pgDashboard(){var now=new Date(),y=now.getFullYear(),m=now.getMonth();var areas=DB.get('areas');var lomba=areas.filter(function(a){return a.type==='lomba'});var nonL=areas.filter(function(a){return a.type==='non-lomba'});var td=todayStr();var todayPen=getAllPenilaian().filter(function(p){return p.date===td});var doneShifts={};todayPen.forEach(function(p){doneShifts[p.areaId+'_'+p.shift]=1;});var pct=areas.length>0?Math.round(Object.keys(doneShifts).length/(areas.length*2)*100):0;var scores=[];areas.forEach(function(a){var s=calcScore(a.id,y,m);if(s)scores.push(s);});scores.sort(function(a,b){return b.final-a.final});var top=scores[0];var acts=DB.get('activities').slice(-6).reverse();var h='';if(areas.length===0&&CU.role==='admin'){h+='<div class="seed-banner"><p><i class="fas fa-database" style="margin-right:5px"></i>Kosong. Muat data contoh.</p><button class="btn" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3)" onclick="seedFromLogin()"><i class="fas fa-flask"></i>Muat Data Contoh</button></div>';}h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px">';h+='<div class="stat-card"><div class="stat-icon" style="background:#dbeafe;color:#1d4ed8"><i class="fas fa-map-location-dot"></i></div><div><div class="stat-value">'+areas.length+'</div><div class="stat-label">Total Area</div></div></div>';h+='<div class="stat-card"><div class="stat-icon" style="background:#e0f2fe;color:#075985"><i class="fas fa-trophy"></i></div><div><div class="stat-value">'+lomba.length+'</div><div class="stat-label">Area Lomba</div></div></div>';h+='<div class="stat-card"><div class="stat-icon" style="background:#fef3c7;color:#92400e"><i class="fas fa-building"></i></div><div><div class="stat-value">'+nonL.length+'</div><div class="stat-label">Non-Lomba</div></div></div>';h+='<div class="stat-card"><div class="stat-icon" style="background:#ede9fe;color:#6d28d9"><i class="fas fa-chart-pie"></i></div><div><div class="stat-value">'+pct+'%</div><div class="stat-label">Hari Ini</div></div></div></div>';h+='<div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px"><div class="card"><div class="card-header"><div class="card-title">Skor Bulan Ini</div></div><canvas id="ch-d1" height="170"></canvas></div><div class="card"><div class="card-header"><div class="card-title">Komposisi</div></div><canvas id="ch-d2" height="170"></canvas></div></div>';h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div class="card"><div class="card-header"><div class="card-title">Top Performer</div></div>';if(top){h+='<div style="text-align:center;padding:6px 0"><div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#fbbf24);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:20px;margin-bottom:4px"><i class="fas fa-crown"></i></div><div style="font-weight:700;font-size:14px">'+top.area.name+'</div><div style="font-size:10px;color:var(--text-muted)">'+(top.area.type==='lomba'?'Lomba':'Non-Lomba')+'</div><div style="font-size:26px;font-weight:900;color:var(--primary)">'+top.final+'</div></div>';}else{h+='<div class="empty-state"><i class="fas fa-chart-line"></i><p>Belum ada data</p></div>';}h+='</div><div class="card"><div class="card-header"><div class="card-title">Aktivitas Terbaru</div></div>';if(acts.length>0){acts.forEach(function(a){h+='<div style="display:flex;align-items:start;gap:7px;padding:4px 0;border-bottom:1px solid #f1f5f9"><div style="width:5px;height:5px;border-radius:50%;background:var(--primary);margin-top:5px;flex-shrink:0"></div><div><div style="font-size:11px">'+a.desc+'</div><div style="font-size:9px;color:var(--text-muted)">'+fmtD(a.date)+'</div></div></div>';});}else{h+='<div class="empty-state"><i class="fas fa-clock-rotate-left"></i><p>Belum ada aktivitas</p></div>';}h+='</div></div>';var _patterns=detectPatterns().slice(0,5);if(_patterns.length>0){h+='<div class="card" style="margin-top:12px"><div class="card-header"><div class="card-title"><i class="fas fa-triangle-exclamation" style="color:var(--danger)"></i> Pola Bermasalah (Kronis)</div></div>';_patterns.forEach(function(p){h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9"><div><div style="font-weight:600;font-size:12px">'+p.area.name+'</div><div style="font-size:11px;color:var(--text-muted)">'+p.cl.desc+'</div></div><span class="badge badge-tidak">'+p.count+'x NOK</span></div>';});h+='</div>';}document.getElementById('content').innerHTML=h;if(scores.length>0){mkChart('ch-d1',{type:'bar',data:{labels:scores.map(function(s){return s.area.name}),datasets:[{label:'Dasar',data:scores.map(function(s){return s.base}),backgroundColor:'rgba(148,163,184,0.35)',borderRadius:3},{label:'Akhir',data:scores.map(function(s){return s.final}),backgroundColor:scores.map(function(s){return s.area.type==='lomba'?'rgba(37,99,235,0.75)':'rgba(245,158,11,0.7)'}),borderRadius:3}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},scales:{y:{beginAtZero:true}}}});mkChart('ch-d2',{type:'doughnut',data:{labels:['Lomba','Non-Lomba'],datasets:[{data:[lomba.length,nonL.length],backgroundColor:['#2563eb','#f59e0b'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},cutout:'60%'}});}}
 
 function getKantinSettings(){var s=DB.get('kantin_settings');if(!s||Array.isArray(s))s={};return{bonus:(typeof s.bonus==='number'?s.bonus:100),penalty:(typeof s.penalty==='number'?s.penalty:50),wajibVerifikasi:(s.wajibVerifikasi!==false),shiftPagi:(s.shiftPagi||'07:00 - 15:00'),shiftSore:(s.shiftSore||'15:00 - 22:00')};}
 function pgMasterKantin(){
@@ -767,7 +783,7 @@ function pgInputPen(){
   if(!_ipA && areas.length>0) _ipA=areas[0].id;
   if(!_ipD) _ipD=todayStr();
   var cls=_ipA?DB.get('checklists').filter(function(c){return c.areaId===_ipA}):[];
-  var existing=_ipA?DB.get('penilaian').find(function(p){return p.areaId===_ipA&&p.date===_ipD&&p.shift===_ipS}):null;
+  var existing=_ipA?penGetRecord(_ipA,_ipD,_ipS):null;
   var h='<div class="card"><div class="card-header"><div class="card-title"><i class="fas fa-pen-to-square" style="color:var(--primary)"></i>Input Penilaian 5R</div></div>';
   if(CU.role==='spv' || CU.role==='pelaksana'){h+='<div class="info-box info-ok"><i class="fas fa-shield-halved"></i>Akses dibatasi: Anda hanya menilai area yang sudah ditugaskan ke akun Anda.</div>';}
   h+='<div class="pen-toolbar">';
@@ -788,7 +804,7 @@ function pgInputPen(){
     var myDone=0;
     cls.forEach(function(c){var it=existing?existing.items.find(function(i){return i.clId===c.id}):null;if(!it)return;if(editPic&&it.picPhoto)myDone++;else if(editSpv&&it.spvPhoto)myDone++;else if(editPw&&it.pwStatus==='approved')myDone++;});
     h+='<div class="pen-progress-wrap"><i class="fas fa-list-check" style="color:var(--primary)"></i><span class="pen-progress-label">'+myDone+' / '+cls.length+' item</span><div class="progress-bar"><div class="progress-fill" style="width:'+Math.round(myDone/cls.length*100)+'%;background:var(--primary)"></div></div><span class="pen-progress-label" style="color:var(--text-muted);font-weight:600">'+cls.length+' item &times; '+ppi+' = 100 poin</span></div>';
-    if(editPic&&!editSpv&&!editPw)h+='<div class="info-box info-warn"><i class="fas fa-camera"></i>Ambil/upload foto tiap item. AI akan langsung menilai otomatis setelah foto diunggah.</div>';
+    if(editPic&&!editSpv&&!editPw)h+='<div class="info-box info-warn"><i class="fas fa-camera"></i>Ambil/upload foto tiap item dengan teliti. AI akan langsung menilai otomatis setelah foto diunggah, dan foto <strong>terkunci setelah 1x upload</strong> (tidak bisa diganti lagi hari ini).</div>';
     else if(editSpv&&!editPic&&!editPw)h+='<div class="info-box info-warn"><i class="fas fa-camera"></i>Ambil/upload foto verifikasi SPV tiap item. AI akan langsung menilai otomatis.</div>';
     else if(editPw&&!editPic&&!editSpv)h+='<div class="info-box info-warn"><i class="fas fa-check-double"></i>Tombol <strong>Setujui</strong> aktif setelah foto Pelaksana &amp; SPV serta hasil AI keduanya tersedia. Tidak ada pilihan OK/Tidak/Skip lagi.</div>';
     h+='<div class="pen-save-hint" style="margin-bottom:10px"><i class="fas fa-circle-info"></i> Setiap foto &amp; approval tersimpan otomatis, tidak perlu tombol Simpan.</div>';
@@ -819,7 +835,9 @@ function pen_renderPhotoCell(it,role,editable,oddCls){
   // (supaya tidak bisa "coba-coba" ganti foto sampai lolos AI). Pelaksana tetap boleh
   // mengambil ulang foto karena tugasnya memang memperbaiki area lalu memfoto ulang.
   // Admin tetap bisa mengoreksi jika terjadi kesalahan input.
-  var lockedForRole=(role==='spv' && (CU.role==='spv' || CU.role==='pengawas'));
+  // Foto Pelaksana (pic) & SPV sama-sama terkunci setelah upload pertama hari itu, supaya
+  // tidak bisa "coba-coba ganti" sampai lolos AI. Admin tetap bisa mengoreksi jika perlu.
+  var lockedForRole=(role==='pic' && CU.role==='pelaksana') || (role==='spv' && (CU.role==='spv' || CU.role==='pengawas'));
   var html='<div class="chk-cell'+oddCls+' photo-cell" data-label="'+label+'">';
   if(photo){
     html+='<img src="'+photo+'" class="photo-thumb" onclick="window.open(this.src,\'_blank\')">';
@@ -886,23 +904,42 @@ function pgKlasemen(){var now=new Date();if(_klY===undefined){_klY=now.getFullYe
 // otomatis ubah jadi 'tidak' (artinya: Pengawas tidak periksa). Dijalankan tiap kali aplikasi dibuka.
 function autoCloseMissedPengawas(){
   var today=todayStr();
-  var list=DB.get('penilaian');
-  var changed=false;
+  var list=getAllPenilaian();
   list.forEach(function(p){
     if(p.date<today && !p.pwAutoClosed){
+      var changed=false;
       p.items.forEach(function(it){ if(it.pwStatus==='pending'){ it.pwStatus='expired'; it.pwAuto=true; changed=true; } });
       p.pwAutoClosed=true;
+      // Simpan HANYA record ini (key sendiri), bukan seluruh data penilaian, supaya
+      // tidak menimpa perubahan record lain yang mungkin sedang disimpan device lain.
+      if(changed) DB.set(penKey(p.areaId,p.date,p.shift), p);
     }
   });
-  if(changed) DB.set('penilaian', list);
+}
+
+// Migrasi satu kali: pindahkan data lama (key tunggal 'penilaian' berisi array besar)
+// ke format baru (satu key per record). Aman dijalankan berkali-kali -- kalau data lama
+// sudah kosong/sudah dimigrasi, fungsi ini tidak melakukan apa-apa.
+function migrateOldPenilaian(cb){
+  var old=_cache['penilaian'];
+  if(!old || !Array.isArray(old) || old.length===0){ cb(); return; }
+  var n=old.length, done=0;
+  old.forEach(function(rec){
+    if(rec && rec.areaId && rec.date && rec.shift){
+      DB.set(penKey(rec.areaId,rec.date,rec.shift), rec, function(){ done++; if(done===n) finish(); });
+    } else { done++; if(done===n) finish(); }
+  });
+  function finish(){ DB.set('penilaian', [], function(){ cb(); }); }
 }
 
 document.getElementById('top-date').textContent=new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
 loadAllDataFromServer(function(){
-  ensureAdmin();
-  autoCloseMissedPengawas();
-  applyBranding();
-  var s=getSession();if(s){CU=s;document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='flex';buildMenu();buildSidebarUser();nav('dashboard');}
+  migrateOldPenilaian(function(){
+    ensureAdmin();
+    autoCloseMissedPengawas();
+    applyBranding();
+    var s=getSession();if(s){CU=s;document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='flex';buildMenu();buildSidebarUser();nav('dashboard');}
+  });
 });
 </script>
 </body>
