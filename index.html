@@ -312,11 +312,22 @@ function compressPhoto(file,cb){
 }
 // AI Vision beneran: manggil Supabase Edge Function 'assess-photo' yang meneruskan ke Gemini
 var AI_FUNCTION_URL = SUPABASE_URL + '/functions/v1/assess-photo';
+// BUGFIX: fetch ke AI sebelumnya tidak punya batas waktu sama sekali. Kalau koneksi
+// lambat / edge function cold-start / request nyangkut di jaringan, promise-nya tidak
+// pernah resolve/reject -> cb() tidak pernah dipanggil -> badge "Menilai..." berputar
+// selamanya (ini bug yang dilaporkan: upload foto SPV lama & loading terus).
+// Solusi: pakai AbortController supaya request otomatis dibatalkan setelah AI_TIMEOUT_MS,
+// dan cb() tetap dipanggil (dengan status gagal) walau AI tidak pernah merespon.
+var AI_TIMEOUT_MS = 25000;
 function aiAssessPhoto(itemDesc,photoDataUrl,refPhoto,cb){
+  var controller = (typeof AbortController!=='undefined') ? new AbortController() : null;
+  var timedOut = false;
+  var timer = controller ? setTimeout(function(){ timedOut = true; controller.abort(); }, AI_TIMEOUT_MS) : null;
   fetch(AI_FUNCTION_URL,{
     method:'POST',
     headers:sbHeaders(),
-    body:JSON.stringify({itemDesc:itemDesc,photoBase64:photoDataUrl,refPhotoBase64:refPhoto||null})
+    body:JSON.stringify({itemDesc:itemDesc,photoBase64:photoDataUrl,refPhotoBase64:refPhoto||null}),
+    signal: controller ? controller.signal : undefined
   }).then(function(r){
     if(!r.ok) return r.text().then(function(t){ throw new Error('HTTP '+r.status+': '+t); });
     return r.json();
@@ -325,10 +336,12 @@ function aiAssessPhoto(itemDesc,photoDataUrl,refPhoto,cb){
     cb({result:data.result==='ok'?'ok':'nok',note:data.note||'-',ts:data.ts||Date.now()});
   }).catch(function(e){
     // Tampilkan alasan ASLI kenapa AI gagal (bukan pesan generik) supaya gampang di-debug.
-    var realMsg=(e&&e.message)?e.message:'Tidak diketahui';
+    var realMsg = timedOut ? ('Waktu tunggu AI habis ('+(AI_TIMEOUT_MS/1000)+' detik), server AI tidak merespon.') : ((e&&e.message)?e.message:'Tidak diketahui');
     console.error('Gagal menilai foto dengan AI:', e);
     if(typeof toast==='function') toast('AI gagal menilai foto: '+realMsg,'error');
     cb({result:'nok',note:'AI gagal menilai (bukan hasil audit): '+realMsg,ts:Date.now()});
+  }).finally(function(){
+    if(timer) clearTimeout(timer);
   });
 }
 function pen_getRecord(){return penGetRecord(_ipA,_ipD,_ipS);}
@@ -363,6 +376,27 @@ function onPickPhoto(inputEl,clId,role){
       toast('AI menilai foto: '+(aiRes.result==='ok'?'Sesuai standar':'Tidak sesuai standar'),aiRes.result==='ok'?'success':'error');
       if(curPage==='input-penilaian')pgInputPen();
     });
+  });
+}
+// Retry manual: dipakai kalau penilaian AI sempat gagal/timeout atau (untuk data lama
+// sebelum bugfix ini) sempat nyangkut permanen di status "Menilai...". Tidak perlu upload
+// ulang foto (foto SPV/Pelaksana terkunci per hari), cukup panggil ulang AI dgn foto yg sama.
+function retryAiAssess(clId,role){
+  var rec=pen_getRecord();if(!rec)return;
+  var it=rec.items.find(function(i){return i.clId===clId});if(!it)return;
+  var photo=role==='pic'?it.picPhoto:it.spvPhoto;
+  if(!photo){toast('Foto belum ada.','error');return;}
+  var cls=DB.get('checklists').filter(function(c){return c.areaId===_ipA});
+  var clObj=cls.find(function(c){return c.id===clId});
+  pgInputPen();
+  toast('Menilai ulang foto dengan AI...');
+  aiAssessPhoto(clObj?clObj.desc:'',photo,clObj?clObj.refPhoto:null,function(aiRes){
+    var rec2=pen_getRecord();if(!rec2)return;
+    var it2=rec2.items.find(function(i){return i.clId===clId});if(!it2)return;
+    if(role==='pic')it2.picAi=aiRes;else it2.spvAi=aiRes;
+    DB.set(penKey(rec2.areaId,rec2.date,rec2.shift),rec2);
+    toast('AI menilai foto: '+(aiRes.result==='ok'?'Sesuai standar':'Tidak sesuai standar'),aiRes.result==='ok'?'success':'error');
+    if(curPage==='input-penilaian')pgInputPen();
   });
 }
 function pengawasDecide(clId,decision){
@@ -935,7 +969,7 @@ function pen_renderPhotoCell(it,role,editable,oddCls){
   if(photo){
     html+='<img src="'+photo+'" class="photo-thumb" onclick="window.open(this.src,\'_blank\')">';
     if(ai)html+='<span class="ai-badge '+(ai.result==='ok'?'ai-badge-ok':'ai-badge-nok')+'" title="'+String(ai.note||'').replace(/"/g,'&quot;')+'"><i class="fas '+(ai.result==='ok'?'fa-check':'fa-xmark')+'"></i>'+(ai.result==='ok'?'OK':'NOK')+'</span>';
-    else html+='<span class="ai-badge ai-badge-pending"><i class="fas fa-spinner fa-spin"></i>Menilai...</span>';
+    else html+='<span class="ai-badge ai-badge-pending"><i class="fas fa-spinner fa-spin"></i>Menilai...</span><span class="photo-retake" style="cursor:pointer" onclick="retryAiAssess(\''+it.clId+'\',\''+role+'\')" title="Kalau sudah menunggu lama, klik untuk menilai ulang"><i class="fas fa-rotate-right"></i>Coba Lagi</span>';
     if(editable && !lockedForRole)html+='<label class="photo-retake"><i class="fas fa-camera-rotate"></i>Ganti Foto<input type="file" accept="image/*" capture="environment" style="display:none" onchange="onPickPhoto(this,\''+it.clId+'\',\''+role+'\')"></label>';
     else if(editable && lockedForRole)html+='<span style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:4px;margin-top:3px"><i class="fas fa-lock"></i>Foto hari ini terkunci</span>';
   }else if(editable){
