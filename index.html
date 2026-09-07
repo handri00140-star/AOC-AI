@@ -99,7 +99,7 @@ td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;vertica
 .info-warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
 .info-ok{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
 .chk-section{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
-.chk-grid{display:grid;grid-template-columns:1fr 90px 90px 200px;gap:0}
+.chk-grid{display:grid;grid-template-columns:1fr 90px 90px 220px 200px;gap:0}
 .chk-head{padding:9px 10px;background:#f8fafc;font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:var(--text-muted);border-bottom:2px solid var(--border);text-align:center;position:sticky;top:0}
 .chk-head:first-child{text-align:left}
 .chk-cat{background:linear-gradient(135deg,#1e40af,#2563eb);padding:8px 12px;font-weight:700;font-size:11px;color:#fff;display:flex;align-items:center;gap:7px;letter-spacing:.3px}
@@ -365,11 +365,11 @@ function onPickPhoto(inputEl,clId,role){
     });
   });
 }
-function approveItem(clId){
+function pengawasDecide(clId,decision){
   var rec=pen_getRecord();if(!rec)return;
   var it=rec.items.find(function(i){return i.clId===clId});if(!it||!it.picAi||!it.spvAi)return;
-  it.pwStatus='approved';it.pwApprovedBy=CU.name;it.pwApprovedAt=Date.now();
-  DB.set(penKey(rec.areaId,rec.date,rec.shift),rec,function(ok){if(ok){toast('Item disetujui');logAct('Approve item penilaian '+_ipD+' shift '+_ipS);}});
+  it.pwStatus=decision;it.pwApprovedBy=CU.name;it.pwApprovedAt=Date.now();
+  DB.set(penKey(rec.areaId,rec.date,rec.shift),rec,function(ok){if(ok){toast(decision==='ok'?'Item dikonfirmasi OK':'Item dikonfirmasi Tidak OK');logAct('Konfirmasi Pengawas ('+decision.toUpperCase()+') item penilaian '+_ipD+' shift '+_ipS);}});
   pgInputPen();
 }
 function ensureAdmin(){var users=DB.get('users');var found=false;for(var i=0;i<users.length;i++){if(users[i].username==='admin'){found=true;break;}}if(!found){users.push({id:'admin_default',name:'Administrator',username:'admin',password:'admin123',dept:'GM',role:'admin',areas:[],ts:Date.now()});DB.set('users',users);}}
@@ -411,7 +411,7 @@ function seedFromLogin(){
   var rollingSeed=[];var idx=0;for(var d=1;d<=n;d++){var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');rollingSeed.push({id:DB.uid(),date:ds,dept:depts[idx],shift:'Pagi/Sore'});idx++;if(idx>=depts.length)idx=0;}DB.set('rolling_dept_pengawas',rollingSeed);
   var SEED_PHOTO='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
   var pen=[];
-  areas.forEach(function(a){var aCls=cls.filter(function(c){return c.areaId===a.id});['pagi','siang'].forEach(function(shift){var items=aCls.map(function(cl,i){var okPic=(i%5!==3);var okSpv=(i%7!==5);return{clId:cl.id,picPhoto:SEED_PHOTO,picAi:{result:okPic?'ok':'nok',note:'Data contoh',ts:1},spvPhoto:SEED_PHOTO,spvAi:{result:okSpv?'ok':'nok',note:'Data contoh',ts:1},pwStatus:(okPic&&okSpv)?'approved':'expired'};});pen.push({id:DB.uid(),areaId:a.id,date:todayStr(),shift:shift,items:items,submittedBy:'admin_default',ts:Date.now()});});});
+  areas.forEach(function(a){var aCls=cls.filter(function(c){return c.areaId===a.id});['pagi','siang'].forEach(function(shift){var items=aCls.map(function(cl,i){var okPic=(i%5!==3);var okSpv=(i%7!==5);return{clId:cl.id,picPhoto:SEED_PHOTO,picAi:{result:okPic?'ok':'nok',note:'Data contoh',ts:1},spvPhoto:SEED_PHOTO,spvAi:{result:okSpv?'ok':'nok',note:'Data contoh',ts:1},pwStatus:(okPic&&okSpv)?'ok':'nok'};});pen.push({id:DB.uid(),areaId:a.id,date:todayStr(),shift:shift,items:items,submittedBy:'admin_default',ts:Date.now()});});});
   pen.forEach(function(rec){DB.set(penKey(rec.areaId,rec.date,rec.shift),rec);});
   DB.set('inisiatif',[{id:DB.uid(),areaId:'a1',date:todayStr(),desc:'Menemukan kabel terkelupas di area Line B',reporter:'Andi Pratama',ts:1}]);
   DB.set('mystery',[{id:DB.uid(),areaId:'a3',date:todayStr(),desc:'Alat tidak tersimpan di tempatnya setelah jam kerja',ts:1}]);DB.set('pk_result',[]);
@@ -424,7 +424,7 @@ function doLogout(){CU=null;clearSession();document.getElementById('login-screen
 document.getElementById('login-pass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
 document.getElementById('login-user').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('login-pass').focus()});
 
-var MENU_DEF=[{id:'dashboard',icon:'fa-gauge-high',label:'Dashboard',roles:['admin','pengawas','spv','pelaksana'],group:'Utama'},{id:'app-settings',icon:'fa-gear',label:'Pengaturan Aplikasi',roles:['admin'],group:'Utama'},{id:'master-area',icon:'fa-map-location-dot',label:'Master Area',roles:['admin'],group:'Master Data'},{id:'master-checksheet',icon:'fa-clipboard-check',label:'Master Checksheet',roles:['admin'],group:'Master Data'},{id:'master-user',icon:'fa-users-gear',label:'Master User',roles:['admin'],group:'Master Data'},{id:'master-kantin',icon:'fa-utensils',label:'Master Kantin',roles:['admin'],group:'Master Data'},{id:'jadwal-piket',icon:'fa-calendar-check',label:'Jadwal Piket Kantin',roles:['admin'],group:'Jadwal'},{id:'jadwal-pengawas',icon:'fa-rotate',label:'Rolling Pengawas',roles:['admin'],group:'Jadwal'},{id:'tukar-jadwal',icon:'fa-right-left',label:'Tukar Jadwal Pengawas',roles:['admin','pengawas'],group:'Jadwal'},{id:'input-penilaian',icon:'fa-pen-to-square',label:'Penilaian 5R',roles:['admin','pengawas','spv','pelaksana'],group:'Input Penilaian'},{id:'input-inisiatif',icon:'fa-lightbulb',label:'Inisiatif',roles:['admin','pengawas','spv','pelaksana'],group:'Input Penilaian'},{id:'input-mystery',icon:'fa-user-secret',label:'Mystery Guest',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'input-piket-kantin',icon:'fa-utensils',label:'Piket Kantin',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'rekap-bulanan',icon:'fa-chart-bar',label:'Rekap Bulanan',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'},{id:'klasemen',icon:'fa-trophy',label:'Klasemen Lomba',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'}];
+var MENU_DEF=[{id:'dashboard',icon:'fa-gauge-high',label:'Dashboard',roles:['admin','pengawas','spv','pelaksana'],group:'Utama'},{id:'app-settings',icon:'fa-gear',label:'Pengaturan Aplikasi',roles:['admin'],group:'Utama'},{id:'pengaturan-ai',icon:'fa-robot',label:'Pengaturan AI',roles:['admin'],group:'Utama'},{id:'master-area',icon:'fa-map-location-dot',label:'Master Area',roles:['admin'],group:'Master Data'},{id:'master-checksheet',icon:'fa-clipboard-check',label:'Master Checksheet',roles:['admin'],group:'Master Data'},{id:'master-user',icon:'fa-users-gear',label:'Master User',roles:['admin'],group:'Master Data'},{id:'master-kantin',icon:'fa-utensils',label:'Master Kantin',roles:['admin'],group:'Master Data'},{id:'jadwal-piket',icon:'fa-calendar-check',label:'Jadwal Piket Kantin',roles:['admin'],group:'Jadwal'},{id:'jadwal-pengawas',icon:'fa-rotate',label:'Rolling Pengawas',roles:['admin'],group:'Jadwal'},{id:'tukar-jadwal',icon:'fa-right-left',label:'Tukar Jadwal Pengawas',roles:['admin','pengawas'],group:'Jadwal'},{id:'input-penilaian',icon:'fa-pen-to-square',label:'Penilaian 5R',roles:['admin','pengawas','spv','pelaksana'],group:'Input Penilaian'},{id:'input-inisiatif',icon:'fa-lightbulb',label:'Inisiatif',roles:['admin','pengawas','spv','pelaksana'],group:'Input Penilaian'},{id:'input-mystery',icon:'fa-user-secret',label:'Mystery Guest',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'input-piket-kantin',icon:'fa-utensils',label:'Piket Kantin',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'rekap-bulanan',icon:'fa-chart-bar',label:'Rekap Bulanan',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'},{id:'klasemen',icon:'fa-trophy',label:'Klasemen Lomba',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'}];
 var PAGE_TITLES={};MENU_DEF.forEach(function(m){PAGE_TITLES[m.id]=m.label});
 function canAccess(pageId){var m=MENU_DEF.find(function(x){return x.id===pageId});if(!m||!CU)return false;return m.roles.indexOf(CU.role)>=0;}
 function pendingSwapCount(){if(!CU)return 0;var reqs=DB.get('swap_pengawas')||[];return reqs.filter(function(r){return r.status==='pending';}).length;}
@@ -434,13 +434,41 @@ function buildMenu(){var html='';var lastGroup='';MENU_DEF.forEach(function(m){i
 function buildSidebarUser(){if(!CU){document.getElementById('sidebar-user').innerHTML='';return;}var colors={admin:'#ef4444',pengawas:'#3b82f6',spv:'#f59e0b',pelaksana:'#6366f1'};var initials=CU.name.split(' ').map(function(w){return w[0]}).join('').substring(0,2).toUpperCase();document.getElementById('sidebar-user').innerHTML='<div class="sidebar-avatar" style="background:'+colors[CU.role]+'">'+initials+'</div><div class="sidebar-userinfo"><div class="name">'+CU.name+'</div><div class="role">'+ROLES[CU.role]+'</div></div>';}
 var curPage='dashboard';
 function refreshCU(){if(!CU)return;var fresh=DB.get('users').find(function(x){return x.id===CU.id});if(fresh){CU=fresh;setSession(fresh);}}
-function nav(pg){refreshCU();if(!canAccess(pg)){document.getElementById('content').innerHTML='<div class="no-access"><i class="fas fa-lock"></i><p>Anda tidak memiliki akses.</p></div>';return;}curPage=pg;document.querySelectorAll('.menu-item').forEach(function(m){m.classList.toggle('active',m.getAttribute('data-page')===pg)});document.getElementById('page-title').textContent=PAGE_TITLES[pg]||'';var fn={dashboard:pgDashboard,'app-settings':pgAppSettings,'master-area':pgMasterArea,'master-checksheet':pgMasterCheck,'master-user':pgMasterUser,'master-kantin':pgMasterKantin,'jadwal-piket':pgJadwalPiket,'jadwal-pengawas':pgJadwalPw,'tukar-jadwal':pgTukarJadwal,'input-penilaian':pgInputPen,'input-inisiatif':pgInputIni,'input-mystery':pgInputMys,'input-piket-kantin':pgInputPK,'rekap-bulanan':pgRekap,klasemen:pgKlasemen};if(fn[pg])fn[pg]();else document.getElementById('content').innerHTML='<div class="empty-state"><p>Halaman belum tersedia.</p></div>';document.getElementById('sidebar').classList.remove('open');}
+function nav(pg){refreshCU();if(!canAccess(pg)){document.getElementById('content').innerHTML='<div class="no-access"><i class="fas fa-lock"></i><p>Anda tidak memiliki akses.</p></div>';return;}curPage=pg;document.querySelectorAll('.menu-item').forEach(function(m){m.classList.toggle('active',m.getAttribute('data-page')===pg)});document.getElementById('page-title').textContent=PAGE_TITLES[pg]||'';var fn={dashboard:pgDashboard,'app-settings':pgAppSettings,'pengaturan-ai':pgPengaturanAI,'master-area':pgMasterArea,'master-checksheet':pgMasterCheck,'master-user':pgMasterUser,'master-kantin':pgMasterKantin,'jadwal-piket':pgJadwalPiket,'jadwal-pengawas':pgJadwalPw,'tukar-jadwal':pgTukarJadwal,'input-penilaian':pgInputPen,'input-inisiatif':pgInputIni,'input-mystery':pgInputMys,'input-piket-kantin':pgInputPK,'rekap-bulanan':pgRekap,klasemen:pgKlasemen};if(fn[pg])fn[pg]();else document.getElementById('content').innerHTML='<div class="empty-state"><p>Halaman belum tersedia.</p></div>';document.getElementById('sidebar').classList.remove('open');}
 var _charts={};function mkChart(id,cfg){if(_charts[id]){_charts[id].destroy();delete _charts[id];}var el=document.getElementById(id);if(!el)return;_charts[id]=new Chart(el,cfg);}
 
-function calcScore(areaId,y,m){var area=DB.get('areas').find(function(a){return a.id===areaId});if(!area)return null;var cls=DB.get('checklists').filter(function(c){return c.areaId===areaId});var n=cls.length;if(n===0)return{base:0,initB:0,mysP:0,kantB:0,kantP:0,final:0,area:area};var ppi=100/n;var pen=getAllPenilaian().filter(function(p){return p.areaId===areaId&&p.date.substring(0,7)===mPrefix(y,m)});var dates=allDates(y,m);var daily=[];dates.forEach(function(date){var shifts=[];['pagi','siang'].forEach(function(shift){var rec=pen.find(function(p){return p.date===date&&p.shift===shift});if(rec&&rec.items){var t=0;cls.forEach(function(cl){var it=rec.items.find(function(i){return i.clId===cl.id});if(it&&it.picAi&&it.picAi.result==='ok'&&it.spvAi&&it.spvAi.result==='ok'&&it.pwStatus!=='expired')t+=ppi;});shifts.push(t);}});if(shifts.length>0)daily.push(shifts.reduce(function(a,b){return a+b},0)/shifts.length);});var base=daily.length>0?daily.reduce(function(a,b){return a+b},0)/daily.length:0;var pf=mPrefix(y,m);var initB=DB.get('inisiatif').filter(function(i){return i.areaId===areaId&&i.date.substring(0,7)===pf}).length*25;var mysP=DB.get('mystery').filter(function(x){return x.areaId===areaId&&x.date.substring(0,7)===pf}).length*25;var ks=getKantinSettings();var kantB=0,kantP=0;DB.get('pk_result').forEach(function(r){if(r.date.substring(0,7)!==pf)return;var okVerif=ks.wajibVerifikasi?!!r.verified:true;if(!okVerif)return;var duty=getDuty(r.date,r.shift);if(duty!==areaId)return;if(r.clean)kantB+=ks.bonus;else kantP+=ks.penalty;});var fin=base+initB-mysP+kantB-kantP;if(area.type==='non-lomba'&&fin>100)fin=100;return{base:Math.round(base*100)/100,initB:initB,mysP:mysP,kantB:kantB,kantP:kantP,final:Math.round(fin*100)/100,area:area};}
+function calcScore(areaId,y,m){var area=DB.get('areas').find(function(a){return a.id===areaId});if(!area)return null;var cls=DB.get('checklists').filter(function(c){return c.areaId===areaId});var n=cls.length;if(n===0)return{base:0,initB:0,mysP:0,kantB:0,kantP:0,final:0,area:area};var ppi=100/n;var pen=getAllPenilaian().filter(function(p){return p.areaId===areaId&&p.date.substring(0,7)===mPrefix(y,m)});var dates=allDates(y,m);var daily=[];dates.forEach(function(date){var shifts=[];['pagi','siang'].forEach(function(shift){var rec=pen.find(function(p){return p.date===date&&p.shift===shift});if(rec&&rec.items){var t=0;cls.forEach(function(cl){var it=rec.items.find(function(i){return i.clId===cl.id});if(it&&it.picAi&&it.picAi.result==='ok'&&it.spvAi&&it.spvAi.result==='ok'&&it.pwStatus==='ok')t+=ppi;});shifts.push(t);}});if(shifts.length>0)daily.push(shifts.reduce(function(a,b){return a+b},0)/shifts.length);});var base=daily.length>0?daily.reduce(function(a,b){return a+b},0)/daily.length:0;var pf=mPrefix(y,m);var initB=DB.get('inisiatif').filter(function(i){return i.areaId===areaId&&i.date.substring(0,7)===pf}).length*25;var mysP=DB.get('mystery').filter(function(x){return x.areaId===areaId&&x.date.substring(0,7)===pf}).length*25;var ks=getKantinSettings();var kantB=0,kantP=0;DB.get('pk_result').forEach(function(r){if(r.date.substring(0,7)!==pf)return;var okVerif=ks.wajibVerifikasi?!!r.verified:true;if(!okVerif)return;var duty=getDuty(r.date,r.shift);if(duty!==areaId)return;if(r.clean)kantB+=ks.bonus;else kantP+=ks.penalty;});var fin=base+initB-mysP+kantB-kantP;if(area.type==='non-lomba'&&fin>100)fin=100;return{base:Math.round(base*100)/100,initB:initB,mysP:mysP,kantB:kantB,kantP:kantP,final:Math.round(fin*100)/100,area:area};}
 function getDuty(date,shift){var s=DB.get('piket_kantin').find(function(p){return p.date===date&&p.shift===shift});return s?s.areaId:null;}
 function getPwForDate(dateStr){var ws=weekStart(dateStr);var s=DB.get('pw_schedule').find(function(x){return x.weekStart===ws});if(!s)return null;return DB.get('users').find(function(u){return u.id===s.pwId&&u.role==='pengawas'})||null;}
 
+function getAiSettings(){var s=DB.get('ai_settings');if(!s||Array.isArray(s))s={};return{model:(s.model||'gemini-3.6-flash')};}
+function pgPengaturanAI(){
+  var s=getAiSettings();
+  var h='<div class="card"><div class="card-title" style="margin-bottom:6px"><i class="fas fa-robot"></i> Pengaturan Koneksi AI (Gemini)</div>';
+  h+='<div class="info-box" style="margin-bottom:14px"><i class="fas fa-circle-info"></i> AI dipakai untuk menilai foto Pelaksana &amp; SPV secara otomatis di menu Penilaian 5R, dengan cara membandingkan ke Foto Referensi yang di-set di Master Checksheet. Koneksinya lewat Supabase Edge Function <code>assess-photo</code> yang memanggil Google Gemini. Kalau Google mempensiunkan sebuah model (kadang terjadi), Anda tidak perlu edit kode lagi &mdash; cukup ganti nama model di bawah ini.</div>';
+  h+='<div class="form-group"><label class="form-label">Nama Model Gemini</label><input class="form-input" id="ai-model" value="'+s.model+'" placeholder="contoh: gemini-3.6-flash"></div>';
+  h+='<div style="font-size:11px;color:var(--text-muted);margin:-6px 0 12px">Kalau muncul error "model ... no longer available", ganti nama model di sini sesuai yang disebut di pesan errornya, lalu Simpan.</div>';
+  h+='<button class="btn btn-primary" onclick="saveAiSettings()"><i class="fas fa-save"></i> Simpan</button> ';
+  h+='<button class="btn btn-outline" onclick="testAiConnection()"><i class="fas fa-plug-circle-check"></i> Tes Koneksi AI</button>';
+  h+='<div id="ai-test-result" style="margin-top:12px"></div>';
+  h+='</div>';
+  document.getElementById('content').innerHTML=h;
+}
+function saveAiSettings(){
+  var model=document.getElementById('ai-model').value.trim()||'gemini-3.6-flash';
+  DB.set('ai_settings',{model:model},function(ok){if(ok){toast('Pengaturan AI disimpan');logAct('Update pengaturan AI (model: '+model+')');}});
+}
+function testAiConnection(){
+  var el=document.getElementById('ai-test-result');
+  el.innerHTML='<span style="font-size:12px;color:var(--text-muted)"><i class="fas fa-spinner fa-spin"></i> Menghubungi AI...</span>';
+  var dot='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
+  fetch(AI_FUNCTION_URL,{method:'POST',headers:sbHeaders(),body:JSON.stringify({itemDesc:'Tes Koneksi AI',photoBase64:dot,refPhotoBase64:dot})})
+    .then(function(r){return r.text().then(function(t){return{status:r.status,ok:r.ok,text:t};});})
+    .then(function(res){
+      if(res.ok){el.innerHTML='<div class="info-box info-ok"><i class="fas fa-circle-check"></i> Berhasil terhubung ke AI. Respons server: '+res.text.substring(0,200)+'</div>';}
+      else{el.innerHTML='<div class="info-box" style="background:#fee2e2;border:1px solid #fecaca;color:#991b1b"><i class="fas fa-triangle-exclamation"></i> Gagal (HTTP '+res.status+'): '+res.text.substring(0,300)+'</div>';}
+    }).catch(function(e){el.innerHTML='<div class="info-box" style="background:#fee2e2;border:1px solid #fecaca;color:#991b1b"><i class="fas fa-triangle-exclamation"></i> Gagal terhubung: '+e.message+'</div>';});
+}
 function pgAppSettings(){
   var s=DB.get('app_settings');if(Array.isArray(s))s={};
   var h='<div class="card"><div class="card-title" style="margin-bottom:14px">Pengaturan Nama & Logo Aplikasi</div>';
@@ -802,18 +830,18 @@ function pgInputPen(){
     var ppi=Math.round(100/cls.length*100)/100;
     var editPic=(CU.role==='admin'||CU.role==='pelaksana');var editSpv=(CU.role==='admin'||CU.role==='spv');var editPw=(CU.role==='admin'||CU.role==='pengawas');
     var myDone=0;
-    cls.forEach(function(c){var it=existing?existing.items.find(function(i){return i.clId===c.id}):null;if(!it)return;if(editPic&&it.picPhoto)myDone++;else if(editSpv&&it.spvPhoto)myDone++;else if(editPw&&it.pwStatus==='approved')myDone++;});
+    cls.forEach(function(c){var it=existing?existing.items.find(function(i){return i.clId===c.id}):null;if(!it)return;if(editPic&&it.picPhoto)myDone++;else if(editSpv&&it.spvPhoto)myDone++;else if(editPw&&(it.pwStatus==='ok'||it.pwStatus==='nok'))myDone++;});
     h+='<div class="pen-progress-wrap"><i class="fas fa-list-check" style="color:var(--primary)"></i><span class="pen-progress-label">'+myDone+' / '+cls.length+' item</span><div class="progress-bar"><div class="progress-fill" style="width:'+Math.round(myDone/cls.length*100)+'%;background:var(--primary)"></div></div><span class="pen-progress-label" style="color:var(--text-muted);font-weight:600">'+cls.length+' item &times; '+ppi+' = 100 poin</span></div>';
     if(editPic&&!editSpv&&!editPw)h+='<div class="info-box info-warn"><i class="fas fa-camera"></i>Ambil/upload foto tiap item dengan teliti. AI akan langsung menilai otomatis setelah foto diunggah, dan foto <strong>terkunci setelah 1x upload</strong> (tidak bisa diganti lagi hari ini).</div>';
     else if(editSpv&&!editPic&&!editPw)h+='<div class="info-box info-warn"><i class="fas fa-camera"></i>Ambil/upload foto verifikasi SPV tiap item. AI akan langsung menilai otomatis.</div>';
-    else if(editPw&&!editPic&&!editSpv)h+='<div class="info-box info-warn"><i class="fas fa-check-double"></i>Tombol <strong>Setujui</strong> aktif setelah foto Pelaksana &amp; SPV serta hasil AI keduanya tersedia. Tidak ada pilihan OK/Tidak/Skip lagi.</div>';
+    else if(editPw&&!editPic&&!editSpv)h+='<div class="info-box info-warn"><i class="fas fa-check-double"></i>Pilihan <strong>OK / Tidak OK</strong> aktif setelah foto Pelaksana &amp; SPV serta hasil AI keduanya tersedia. Keputusan Anda menentukan item ini dihitung ke skor atau tidak.</div>';
     h+='<div class="pen-save-hint" style="margin-bottom:10px"><i class="fas fa-circle-info"></i> Setiap foto &amp; approval tersimpan otomatis, tidak perlu tombol Simpan.</div>';
     var lastCat=null;var gridOpen=false;var rowNum=0;
     cls.forEach(function(c){
       if(c.cat!==lastCat){
         if(gridOpen)h+='</div></div>';
         lastCat=c.cat;rowNum=0;
-        h+='<div class="chk-section"><div class="chk-cat"><i class="fas fa-tag"></i>'+lastCat+'</div><div class="chk-grid"><div class="chk-head">Deskripsi</div><div class="chk-head">Foto Pelaksana</div><div class="chk-head">Foto SPV</div><div class="chk-head">Pengawas</div>';
+        h+='<div class="chk-section"><div class="chk-cat"><i class="fas fa-tag"></i>'+lastCat+'</div><div class="chk-grid"><div class="chk-head">Deskripsi</div><div class="chk-head">Foto Pelaksana</div><div class="chk-head">Foto SPV</div><div class="chk-head">Rekomendasi AI</div><div class="chk-head">Pengawas</div>';
         gridOpen=true;
       }
       rowNum++;var oddCls=(rowNum%2===0)?' chk-item-odd':'';
@@ -821,6 +849,7 @@ function pgInputPen(){
       h+='<div class="chk-desc'+oddCls+'"><span class="chk-row-idx">'+rowNum+'</span>'+c.desc+'</div>';
       h+=pen_renderPhotoCell(it,'pic',editPic,oddCls);
       h+=pen_renderPhotoCell(it,'spv',editSpv,oddCls);
+      h+=pen_renderRecommendCell(it,oddCls);
       h+=pen_renderApprovalCell(it,editPw,oddCls);
     });
     if(gridOpen)h+='</div></div>';
@@ -853,15 +882,33 @@ function pen_renderPhotoCell(it,role,editable,oddCls){
   html+='</div>';
   return html;
 }
+function pen_renderRecommendCell(it,oddCls){
+  var html='<div class="chk-cell'+oddCls+'" data-label="Rekomendasi AI" style="flex-direction:column;align-items:flex-start;gap:5px;text-align:left">';
+  var rows=[];
+  if(it.picAi && it.picAi.result==='nok') rows.push({who:'Pelaksana',note:it.picAi.note});
+  if(it.spvAi && it.spvAi.result==='nok') rows.push({who:'SPV',note:it.spvAi.note});
+  if(rows.length===0){
+    if(it.picAi && it.spvAi) html+='<span style="font-size:11px;color:var(--success)"><i class="fas fa-circle-check"></i> Sudah sesuai standar</span>';
+    else html+='<span style="font-size:10px;color:var(--text-muted)">Menunggu hasil AI</span>';
+  }else{
+    rows.forEach(function(r){
+      html+='<div style="font-size:11px;line-height:1.4"><span style="font-weight:700;color:var(--danger)">Foto '+r.who+':</span> '+(r.note||'Tidak sesuai standar, cek kembali kondisi area.')+'</div>';
+    });
+  }
+  html+='</div>';
+  return html;
+}
 function pen_renderApprovalCell(it,editable,oddCls){
   var html='<div class="chk-cell'+oddCls+'" data-label="Pwas">';
-  if(it.pwStatus==='approved'){
-    html+='<span class="badge badge-ok" title="Disetujui oleh '+(it.pwApprovedBy||'-')+'"><i class="fas fa-check-double"></i> Disetujui</span>';
+  if(it.pwStatus==='ok'){
+    html+='<span class="badge badge-ok" title="Dikonfirmasi oleh '+(it.pwApprovedBy||'-')+'"><i class="fas fa-check-double"></i> OK</span>';
+  }else if(it.pwStatus==='nok'){
+    html+='<span class="badge badge-tidak" title="Dikonfirmasi oleh '+(it.pwApprovedBy||'-')+'"><i class="fas fa-xmark"></i> Tidak OK</span>';
   }else if(it.pwStatus==='expired'){
     html+='<span class="badge badge-tidak"><i class="fas fa-clock"></i> Lewat Waktu</span>';
   }else if(it.picAi&&it.spvAi){
-    if(editable)html+='<button class="btn btn-sm btn-primary" onclick="approveItem(\''+it.clId+'\')"><i class="fas fa-check"></i>Setujui</button>';
-    else html+='<span class="badge badge-skip">Menunggu Approval</span>';
+    if(editable)html+='<div style="display:flex;gap:5px"><button class="btn btn-sm btn-primary" onclick="pengawasDecide(\''+it.clId+'\',\'ok\')"><i class="fas fa-check"></i>OK</button><button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="pengawasDecide(\''+it.clId+'\',\'nok\')"><i class="fas fa-xmark"></i>Tidak OK</button></div>';
+    else html+='<span class="badge badge-skip">Menunggu Pengawas</span>';
   }else{
     html+='<span style="font-size:10px;color:var(--text-muted)">Menunggu foto &amp; penilaian AI</span>';
   }
