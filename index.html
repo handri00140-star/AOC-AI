@@ -312,96 +312,109 @@ function compressPhoto(file,cb){
 }
 // AI Vision beneran: manggil Supabase Edge Function 'assess-photo' yang meneruskan ke Gemini
 var AI_FUNCTION_URL = SUPABASE_URL + '/functions/v1/assess-photo';
-// BUGFIX: fetch ke AI sebelumnya tidak punya batas waktu sama sekali. Kalau koneksi
-// lambat / edge function cold-start / request nyangkut di jaringan, promise-nya tidak
-// pernah resolve/reject -> cb() tidak pernah dipanggil -> badge "Menilai..." berputar
-// selamanya (ini bug yang dilaporkan: upload foto SPV lama & loading terus).
-// Solusi: pakai AbortController supaya request otomatis dibatalkan setelah AI_TIMEOUT_MS,
-// dan cb() tetap dipanggil (dengan status gagal) walau AI tidak pernah merespon.
-var AI_TIMEOUT_MS = 25000;
 function aiAssessPhoto(itemDesc,photoDataUrl,refPhoto,cb){
-  var controller = (typeof AbortController!=='undefined') ? new AbortController() : null;
-  var timedOut = false;
-  var timer = controller ? setTimeout(function(){ timedOut = true; controller.abort(); }, AI_TIMEOUT_MS) : null;
+  // FIX: batasi waktu tunggu 45 detik. Tanpa ini, kalau koneksi ke AI macet/lambat,
+  // badge "Menilai..." bisa muter selamanya tanpa pernah kasih tahu ada masalah.
+  var ctrl=(typeof AbortController!=='undefined')?new AbortController():null;
+  var timeoutId=setTimeout(function(){ if(ctrl)ctrl.abort(); },45000);
   fetch(AI_FUNCTION_URL,{
     method:'POST',
     headers:sbHeaders(),
     body:JSON.stringify({itemDesc:itemDesc,photoBase64:photoDataUrl,refPhotoBase64:refPhoto||null}),
-    signal: controller ? controller.signal : undefined
+    signal:ctrl?ctrl.signal:undefined
   }).then(function(r){
+    clearTimeout(timeoutId);
     if(!r.ok) return r.text().then(function(t){ throw new Error('HTTP '+r.status+': '+t); });
     return r.json();
   }).then(function(data){
     if(data.error) throw new Error(data.error);
     cb({result:data.result==='ok'?'ok':'nok',note:data.note||'-',ts:data.ts||Date.now()});
   }).catch(function(e){
+    clearTimeout(timeoutId);
     // Tampilkan alasan ASLI kenapa AI gagal (bukan pesan generik) supaya gampang di-debug.
-    var realMsg = timedOut ? ('Waktu tunggu AI habis ('+(AI_TIMEOUT_MS/1000)+' detik), server AI tidak merespon.') : ((e&&e.message)?e.message:'Tidak diketahui');
+    var realMsg=(e&&e.name==='AbortError')?'Waktu tunggu AI habis (45 detik), server tidak merespons. Coba upload ulang.':((e&&e.message)?e.message:'Tidak diketahui');
     console.error('Gagal menilai foto dengan AI:', e);
     if(typeof toast==='function') toast('AI gagal menilai foto: '+realMsg,'error');
-    cb({result:'nok',note:'AI gagal menilai (bukan hasil audit): '+realMsg,ts:Date.now()});
-  }).finally(function(){
-    if(timer) clearTimeout(timer);
+    cb({result:null,note:'AI gagal menilai (bukan hasil audit): '+realMsg,ts:Date.now(),failed:true});
   });
 }
 function pen_getRecord(){return penGetRecord(_ipA,_ipD,_ipS);}
 function pen_getItems(cls,existing){return cls.map(function(c){var it=existing?existing.items.find(function(i){return i.clId===c.id}):null;return it||{clId:c.id,picPhoto:null,picAi:null,spvPhoto:null,spvAi:null,pwStatus:'pending'};});}
 function pen_saveItems(items,cb){var rec={id:DB.uid(),areaId:_ipA,date:_ipD,shift:_ipS,items:items,submittedBy:CU.id,ts:Date.now()};DB.set(penKey(_ipA,_ipD,_ipS),rec,cb);}
-function onPickPhoto(inputEl,clId,role){
+// --- Alur Upload Foto 2 Langkah: Pilih Foto (staging, belum tersimpan) -> Simpan Foto ---
+// (baru menyimpan ke server & menjalankan AI setelah tombol "Simpan Foto" diklik).
+// _stagedPhotos hanya di memori browser, BUKAN di server -- jadi kalau halaman
+// direfresh sebelum sempat disimpan, foto yang belum di-save akan hilang (harus
+// difoto ulang), tapi begitu "Simpan Foto" diklik, itu baru benar-benar tersimpan.
+var _stagedPhotos={};
+function stagedKey(clId,role){return clId+'_'+role;}
+function onPickPhotoStage(inputEl,clId,role){
   var file=inputEl.files[0];if(!file)return;
   var existingChk=pen_getRecord();
   var itChk=existingChk?existingChk.items.find(function(i){return i.clId===clId;}):null;
-  if(role==='pic' && itChk && itChk.picPhoto && CU.role==='pelaksana'){
-    toast('Foto Pelaksana hari ini sudah terkunci, tidak bisa diganti.','error');inputEl.value='';return;
-  }
-  if(role==='spv' && itChk && itChk.spvPhoto && (CU.role==='spv'||CU.role==='pengawas')){
-    toast('Foto SPV hari ini sudah terkunci, tidak bisa diganti.','error');inputEl.value='';return;
+  var savedPhoto=itChk?(role==='pic'?itChk.picPhoto:itChk.spvPhoto):null;
+  var savedAi=itChk?(role==='pic'?itChk.picAi:itChk.spvAi):null;
+  // Pelaksana & SPV disamakan: begitu foto tersimpan DAN sudah dinilai AI, tidak bisa ganti lagi.
+  // Admin tetap bisa mengoreksi kapan saja.
+  if(savedPhoto && savedAi && !savedAi.failed && CU.role!=='admin'){
+    toast('Foto ini sudah tersimpan & dinilai AI, tidak bisa diganti lagi.','error');inputEl.value='';return;
   }
   var cell=inputEl.closest('.photo-cell');if(cell)cell.classList.add('photo-loading');
   compressPhoto(file,function(dataUrl){
-    var cls=DB.get('checklists').filter(function(c){return c.areaId===_ipA});
-    var existing=pen_getRecord();
-    var items=pen_getItems(cls,existing);
-    var it=items.find(function(i){return i.clId===clId});
-    var clObj=cls.find(function(c){return c.id===clId});
-    if(role==='pic'){it.picPhoto=dataUrl;it.picAi=null;}else{it.spvPhoto=dataUrl;it.spvAi=null;}
-    it.pwStatus='pending';it.pwApprovedBy=null;it.pwApprovedAt=null;
-    pen_saveItems(items);
+    _stagedPhotos[stagedKey(clId,role)]=dataUrl;
     pgInputPen();
-    aiAssessPhoto(clObj?clObj.desc:'',dataUrl,clObj?clObj.refPhoto:null,function(aiRes){
-      var rec=pen_getRecord();if(!rec)return;
-      var it2=rec.items.find(function(i){return i.clId===clId});if(!it2)return;
-      if(role==='pic')it2.picAi=aiRes;else it2.spvAi=aiRes;
-      DB.set(penKey(rec.areaId,rec.date,rec.shift),rec);
-      toast('AI menilai foto: '+(aiRes.result==='ok'?'Sesuai standar':'Tidak sesuai standar'),aiRes.result==='ok'?'success':'error');
-      if(curPage==='input-penilaian')pgInputPen();
-    });
   });
 }
-// Retry manual: dipakai kalau penilaian AI sempat gagal/timeout atau (untuk data lama
-// sebelum bugfix ini) sempat nyangkut permanen di status "Menilai...". Tidak perlu upload
-// ulang foto (foto SPV/Pelaksana terkunci per hari), cukup panggil ulang AI dgn foto yg sama.
-function retryAiAssess(clId,role){
+function cancelStagedPhoto(clId,role){
+  delete _stagedPhotos[stagedKey(clId,role)];
+  pgInputPen();
+}
+function saveStagedPhoto(clId,role){
+  var dataUrl=_stagedPhotos[stagedKey(clId,role)];
+  if(!dataUrl){toast('Tidak ada foto untuk disimpan, ambil foto dulu.','error');return;}
+  var cls=DB.get('checklists').filter(function(c){return c.areaId===_ipA});
+  var existing=pen_getRecord();
+  var items=pen_getItems(cls,existing);
+  var it=items.find(function(i){return i.clId===clId});
+  var clObj=cls.find(function(c){return c.id===clId});
+  if(role==='pic'){it.picPhoto=dataUrl;it.picAi=null;}else{it.spvPhoto=dataUrl;it.spvAi=null;}
+  it.pwStatus='pending';it.pwApprovedBy=null;it.pwApprovedAt=null;
+  pen_saveItems(items);
+  delete _stagedPhotos[stagedKey(clId,role)];
+  pgInputPen();
+  toast('Foto disimpan, sedang dinilai AI...');
+  aiAssessPhoto(clObj?clObj.desc:'',dataUrl,clObj?clObj.refPhoto:null,function(aiRes){
+    var rec=pen_getRecord();if(!rec)return;
+    var it2=rec.items.find(function(i){return i.clId===clId});if(!it2)return;
+    if(role==='pic')it2.picAi=aiRes;else it2.spvAi=aiRes;
+    DB.set(penKey(rec.areaId,rec.date,rec.shift),rec);
+    if(!aiRes.failed) toast('AI menilai foto: '+(aiRes.result==='ok'?'Sesuai standar':'Tidak sesuai standar'),aiRes.result==='ok'?'success':'error');
+    if(curPage==='input-penilaian')pgInputPen();
+  });
+}
+function retryAiForItem(clId,role){
+  // Foto SUDAH tersimpan tapi AI gagal/timeout sebelumnya -- nilai ulang tanpa perlu upload ulang.
   var rec=pen_getRecord();if(!rec)return;
   var it=rec.items.find(function(i){return i.clId===clId});if(!it)return;
   var photo=role==='pic'?it.picPhoto:it.spvPhoto;
-  if(!photo){toast('Foto belum ada.','error');return;}
+  if(!photo){toast('Belum ada foto tersimpan untuk item ini.','error');return;}
   var cls=DB.get('checklists').filter(function(c){return c.areaId===_ipA});
   var clObj=cls.find(function(c){return c.id===clId});
+  if(role==='pic')it.picAi=null;else it.spvAi=null;
+  DB.set(penKey(rec.areaId,rec.date,rec.shift),rec);
   pgInputPen();
-  toast('Menilai ulang foto dengan AI...');
   aiAssessPhoto(clObj?clObj.desc:'',photo,clObj?clObj.refPhoto:null,function(aiRes){
     var rec2=pen_getRecord();if(!rec2)return;
     var it2=rec2.items.find(function(i){return i.clId===clId});if(!it2)return;
     if(role==='pic')it2.picAi=aiRes;else it2.spvAi=aiRes;
     DB.set(penKey(rec2.areaId,rec2.date,rec2.shift),rec2);
-    toast('AI menilai foto: '+(aiRes.result==='ok'?'Sesuai standar':'Tidak sesuai standar'),aiRes.result==='ok'?'success':'error');
+    if(!aiRes.failed) toast('AI menilai foto: '+(aiRes.result==='ok'?'Sesuai standar':'Tidak sesuai standar'),aiRes.result==='ok'?'success':'error');
     if(curPage==='input-penilaian')pgInputPen();
   });
 }
 function pengawasDecide(clId,decision){
   var rec=pen_getRecord();if(!rec)return;
-  var it=rec.items.find(function(i){return i.clId===clId});if(!it||!it.picAi||!it.spvAi)return;
+  var it=rec.items.find(function(i){return i.clId===clId});if(!it||!it.picAi||it.picAi.failed||!it.spvAi||it.spvAi.failed)return;
   it.pwStatus=decision;it.pwApprovedBy=CU.name;it.pwApprovedAt=Date.now();
   DB.set(penKey(rec.areaId,rec.date,rec.shift),rec,function(ok){if(ok){toast(decision==='ok'?'Item dikonfirmasi OK':'Item dikonfirmasi Tidak OK');logAct('Konfirmasi Pengawas ('+decision.toUpperCase()+') item penilaian '+_ipD+' shift '+_ipS);}});
   pgInputPen();
@@ -930,8 +943,8 @@ function pgInputPen(){
     var myDone=0;
     cls.forEach(function(c){var it=existing?existing.items.find(function(i){return i.clId===c.id}):null;if(!it)return;if(editPic&&it.picPhoto)myDone++;else if(editSpv&&it.spvPhoto)myDone++;else if(editPw&&(it.pwStatus==='ok'||it.pwStatus==='nok'))myDone++;});
     h+='<div class="pen-progress-wrap"><i class="fas fa-list-check" style="color:var(--primary)"></i><span class="pen-progress-label">'+myDone+' / '+cls.length+' item</span><div class="progress-bar"><div class="progress-fill" style="width:'+Math.round(myDone/cls.length*100)+'%;background:var(--primary)"></div></div><span class="pen-progress-label" style="color:var(--text-muted);font-weight:600">'+cls.length+' item &times; '+ppi+' = 100 poin</span></div>';
-    if(editPic&&!editSpv&&!editPw)h+='<div class="info-box info-warn"><i class="fas fa-camera"></i>Ambil/upload foto tiap item dengan teliti. AI akan langsung menilai otomatis setelah foto diunggah, dan foto <strong>terkunci setelah 1x upload</strong> (tidak bisa diganti lagi hari ini).</div>';
-    else if(editSpv&&!editPic&&!editPw)h+='<div class="info-box info-warn"><i class="fas fa-camera"></i>Ambil/upload foto verifikasi SPV tiap item. AI akan langsung menilai otomatis.</div>';
+    if(editPic&&!editSpv&&!editPw)h+='<div class="info-box info-warn"><i class="fas fa-camera"></i>Ambil foto dulu, lalu klik <strong>Simpan Foto</strong> untuk mengunci &amp; menjalankan penilaian AI. Setelah disimpan &amp; dinilai AI, foto <strong>tidak bisa diganti lagi</strong> hari ini.</div>';
+    else if(editSpv&&!editPic&&!editPw)h+='<div class="info-box info-warn"><i class="fas fa-camera"></i>Ambil foto verifikasi dulu, lalu klik <strong>Simpan Foto</strong> untuk mengunci &amp; menjalankan penilaian AI. Setelah disimpan &amp; dinilai AI, foto <strong>tidak bisa diganti lagi</strong> hari ini.</div>';
     else if(editPw&&!editPic&&!editSpv)h+='<div class="info-box info-warn"><i class="fas fa-check-double"></i>Pilihan <strong>OK / Tidak OK</strong> aktif setelah foto Pelaksana &amp; SPV serta hasil AI keduanya tersedia. Keputusan Anda menentukan item ini dihitung ke skor atau tidak.</div>';
     h+='<div class="pen-save-hint" style="margin-bottom:10px"><i class="fas fa-circle-info"></i> Setiap foto &amp; approval tersimpan otomatis, tidak perlu tombol Simpan.</div>';
     var lastCat=null;var gridOpen=false;var rowNum=0;
@@ -958,22 +971,41 @@ function pen_renderPhotoCell(it,role,editable,oddCls){
   var photo=role==='pic'?it.picPhoto:it.spvPhoto;
   var ai=role==='pic'?it.picAi:it.spvAi;
   var label=role==='pic'?'Pelaksana':'SPV';
-  // SPV & Pengawas tidak boleh upload ulang/ganti foto verifikasi setelah tersimpan hari itu
-  // (supaya tidak bisa "coba-coba" ganti foto sampai lolos AI). Pelaksana tetap boleh
-  // mengambil ulang foto karena tugasnya memang memperbaiki area lalu memfoto ulang.
-  // Admin tetap bisa mengoreksi jika terjadi kesalahan input.
-  // Foto Pelaksana (pic) & SPV sama-sama terkunci setelah upload pertama hari itu, supaya
-  // tidak bisa "coba-coba ganti" sampai lolos AI. Admin tetap bisa mengoreksi jika perlu.
-  var lockedForRole=(role==='pic' && CU.role==='pelaksana') || (role==='spv' && (CU.role==='spv' || CU.role==='pengawas'));
+  var staged=_stagedPhotos[stagedKey(it.clId,role)];
   var html='<div class="chk-cell'+oddCls+' photo-cell" data-label="'+label+'">';
-  if(photo){
+
+  if(staged){
+    // Foto sudah dipilih tapi BELUM disimpan ke server -- masih bisa dibatalkan/diganti bebas.
+    html+='<img src="'+staged+'" class="photo-thumb" onclick="window.open(this.src,\'_blank\')">';
+    html+='<span class="badge badge-skip" style="margin-top:3px">Belum disimpan</span>';
+    if(editable){
+      html+='<div style="display:flex;gap:5px;margin-top:4px;flex-wrap:wrap">';
+      html+='<button class="btn btn-sm btn-primary" onclick="saveStagedPhoto(\''+it.clId+'\',\''+role+'\')"><i class="fas fa-save"></i>Simpan Foto</button>';
+      html+='<button class="btn btn-sm btn-outline" onclick="cancelStagedPhoto(\''+it.clId+'\',\''+role+'\')"><i class="fas fa-xmark"></i>Batal</button>';
+      html+='</div>';
+    }
+  }else if(photo){
+    // Pelaksana & SPV DISAMAKAN: begitu tersimpan & AI berhasil menilai, terkunci -- tidak bisa
+    // upload ulang lagi hari itu. Admin tetap bisa mengoreksi. Kalau AI gagal/timeout, sediakan
+    // "Nilai Ulang" (tanpa perlu foto baru) supaya tidak ada yang terjebak.
+    var aiDone=ai && !ai.failed;
+    var lockedForRole=aiDone && CU.role!=='admin';
     html+='<img src="'+photo+'" class="photo-thumb" onclick="window.open(this.src,\'_blank\')">';
-    if(ai)html+='<span class="ai-badge '+(ai.result==='ok'?'ai-badge-ok':'ai-badge-nok')+'" title="'+String(ai.note||'').replace(/"/g,'&quot;')+'"><i class="fas '+(ai.result==='ok'?'fa-check':'fa-xmark')+'"></i>'+(ai.result==='ok'?'OK':'NOK')+'</span>';
-    else html+='<span class="ai-badge ai-badge-pending"><i class="fas fa-spinner fa-spin"></i>Menilai...</span><span class="photo-retake" style="cursor:pointer" onclick="retryAiAssess(\''+it.clId+'\',\''+role+'\')" title="Kalau sudah menunggu lama, klik untuk menilai ulang"><i class="fas fa-rotate-right"></i>Coba Lagi</span>';
-    if(editable && !lockedForRole)html+='<label class="photo-retake"><i class="fas fa-camera-rotate"></i>Ganti Foto<input type="file" accept="image/*" capture="environment" style="display:none" onchange="onPickPhoto(this,\''+it.clId+'\',\''+role+'\')"></label>';
-    else if(editable && lockedForRole)html+='<span style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:4px;margin-top:3px"><i class="fas fa-lock"></i>Foto hari ini terkunci</span>';
+    if(ai && ai.failed) html+='<span class="ai-badge" style="background:#fef3c7;color:#92400e" title="'+String(ai.note||'').replace(/"/g,'&quot;')+'"><i class="fas fa-triangle-exclamation"></i>Gagal Dinilai</span>';
+    else if(ai) html+='<span class="ai-badge '+(ai.result==='ok'?'ai-badge-ok':'ai-badge-nok')+'" title="'+String(ai.note||'').replace(/"/g,'&quot;')+'"><i class="fas '+(ai.result==='ok'?'fa-check':'fa-xmark')+'"></i>'+(ai.result==='ok'?'OK':'NOK')+'</span>';
+    else html+='<span class="ai-badge ai-badge-pending"><i class="fas fa-spinner fa-spin"></i>Menilai...</span>';
+
+    if(ai && ai.failed && editable){
+      html+='<button class="btn btn-sm btn-outline" style="margin-top:4px" onclick="retryAiForItem(\''+it.clId+'\',\''+role+'\')"><i class="fas fa-rotate-right"></i>Nilai Ulang</button>';
+    }else if(editable && lockedForRole){
+      html+='<span style="font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:4px;margin-top:3px"><i class="fas fa-lock"></i>Terkunci (sudah dinilai AI)</span>';
+    }else if(editable && ai && CU.role==='admin'){
+      html+='<label class="photo-retake"><i class="fas fa-camera-rotate"></i>Ganti Foto (Admin)<input type="file" accept="image/*" capture="environment" style="display:none" onchange="onPickPhotoStage(this,\''+it.clId+'\',\''+role+'\')"></label>';
+    }
+    // Kalau ai masih null (baru disave, sedang dinilai) -- tidak ada tombol apa pun dulu,
+    // tunggu hasilnya (maksimal 45 detik karena sudah dibatasi timeout).
   }else if(editable){
-    html+='<label class="photo-upload-btn"><i class="fas fa-camera"></i>Ambil/Upload Foto<input type="file" accept="image/*" capture="environment" style="display:none" onchange="onPickPhoto(this,\''+it.clId+'\',\''+role+'\')"></label>';
+    html+='<label class="photo-upload-btn"><i class="fas fa-camera"></i>Ambil/Upload Foto<input type="file" accept="image/*" capture="environment" style="display:none" onchange="onPickPhotoStage(this,\''+it.clId+'\',\''+role+'\')"></label>';
   }else{
     html+='<span style="font-size:11px;color:var(--text-muted)">Belum ada foto</span>';
   }
@@ -983,14 +1015,16 @@ function pen_renderPhotoCell(it,role,editable,oddCls){
 function pen_renderRecommendCell(it,oddCls){
   var html='<div class="chk-cell'+oddCls+'" data-label="Rekomendasi AI" style="flex-direction:column;align-items:flex-start;gap:5px;text-align:left">';
   var rows=[];
-  if(it.picAi && it.picAi.result==='nok') rows.push({who:'Pelaksana',note:it.picAi.note});
-  if(it.spvAi && it.spvAi.result==='nok') rows.push({who:'SPV',note:it.spvAi.note});
+  if(it.picAi && it.picAi.failed) rows.push({who:'Pelaksana',note:it.picAi.note,failed:true});
+  else if(it.picAi && it.picAi.result==='nok') rows.push({who:'Pelaksana',note:it.picAi.note});
+  if(it.spvAi && it.spvAi.failed) rows.push({who:'SPV',note:it.spvAi.note,failed:true});
+  else if(it.spvAi && it.spvAi.result==='nok') rows.push({who:'SPV',note:it.spvAi.note});
   if(rows.length===0){
     if(it.picAi && it.spvAi) html+='<span style="font-size:11px;color:var(--success)"><i class="fas fa-circle-check"></i> Sudah sesuai standar</span>';
     else html+='<span style="font-size:10px;color:var(--text-muted)">Menunggu hasil AI</span>';
   }else{
     rows.forEach(function(r){
-      html+='<div style="font-size:11px;line-height:1.4"><span style="font-weight:700;color:var(--danger)">Foto '+r.who+':</span> '+(r.note||'Tidak sesuai standar, cek kembali kondisi area.')+'</div>';
+      html+='<div style="font-size:11px;line-height:1.4"><span style="font-weight:700;color:'+(r.failed?'#92400e':'var(--danger)')+'">Foto '+r.who+(r.failed?' (gagal dinilai)':'')+':</span> '+(r.note||'Tidak sesuai standar, cek kembali kondisi area.')+'</div>';
     });
   }
   html+='</div>';
@@ -1004,7 +1038,7 @@ function pen_renderApprovalCell(it,editable,oddCls){
     html+='<span class="badge badge-tidak" title="Dikonfirmasi oleh '+(it.pwApprovedBy||'-')+'"><i class="fas fa-xmark"></i> Tidak OK</span>';
   }else if(it.pwStatus==='expired'){
     html+='<span class="badge badge-tidak"><i class="fas fa-clock"></i> Lewat Waktu</span>';
-  }else if(it.picAi&&it.spvAi){
+  }else if(it.picAi&&!it.picAi.failed&&it.spvAi&&!it.spvAi.failed){
     if(editable)html+='<div style="display:flex;gap:5px"><button class="btn btn-sm btn-primary" onclick="pengawasDecide(\''+it.clId+'\',\'ok\')"><i class="fas fa-check"></i>OK</button><button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="pengawasDecide(\''+it.clId+'\',\'nok\')"><i class="fas fa-xmark"></i>Tidak OK</button></div>';
     else html+='<span class="badge badge-skip">Menunggu Pengawas</span>';
   }else{
