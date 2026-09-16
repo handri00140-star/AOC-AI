@@ -467,9 +467,6 @@ function seedFromLogin(){
   var now=new Date(),y=now.getFullYear(),m=now.getMonth(),n=daysInMonth(y,m);var piket=[];
   for(var d=1;d<=n;d++){var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');piket.push({id:DB.uid(),areaId:aIds[(d-1)%7],date:ds,shift:'pagi',ts:1});piket.push({id:DB.uid(),areaId:aIds[d%7],date:ds,shift:'sore',ts:1});}
   DB.set('piket_kantin',piket);
-  var pwUsers=users.filter(function(u){return u.role==='pengawas'});var depts=[...new Set(pwUsers.map(function(u){return u.dept}))].filter(Boolean);
-  for(var i=depts.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var temp=depts[i];depts[i]=depts[j];depts[j]=temp;}
-  var rollingSeed=[];var idx=0;for(var d=1;d<=n;d++){var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');rollingSeed.push({id:DB.uid(),date:ds,dept:depts[idx],shift:'Pagi/Sore'});idx++;if(idx>=depts.length)idx=0;}DB.set('rolling_dept_pengawas',rollingSeed);
   var SEED_PHOTO='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
   var pen=[];
   areas.forEach(function(a){var aCls=cls.filter(function(c){return c.areaId===a.id});['pagi','siang'].forEach(function(shift){var items=aCls.map(function(cl,i){var ok=(i%5!==3);if(ok){return{clId:cl.id,photo:SEED_PHOTO,ai:{result:'ok',note:'Data contoh',ts:1},photoPerbaikan:null,aiPerbaikan:null};}var fixed=(i%2===0);if(fixed){return{clId:cl.id,photo:SEED_PHOTO,ai:{result:'nok',note:'Data contoh - awal tidak sesuai standar',ts:1},photoPerbaikan:SEED_PHOTO,aiPerbaikan:{result:'ok',note:'Data contoh - sudah diperbaiki',ts:1}};}return{clId:cl.id,photo:SEED_PHOTO,ai:{result:'nok',note:'Data contoh - tidak sesuai standar',ts:1},photoPerbaikan:null,aiPerbaikan:null};});pen.push({id:DB.uid(),areaId:a.id,date:todayStr(),shift:shift,items:items,submittedBy:'admin_default',ts:Date.now()});});});
@@ -485,12 +482,10 @@ function doLogout(){CU=null;clearSession();applyThemeColor(computeEffectiveTheme
 document.getElementById('login-pass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
 document.getElementById('login-user').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('login-pass').focus()});
 
-var MENU_DEF=[{id:'dashboard',icon:'fa-gauge-high',label:'Dashboard',roles:['admin','pengawas','spv','pelaksana'],group:'Utama'},{id:'preferensi-tampilan',icon:'fa-palette',label:'Preferensi Tampilan',roles:['admin','pengawas','spv','pelaksana'],group:'Utama'},{id:'app-settings',icon:'fa-gear',label:'Pengaturan Aplikasi',roles:['admin'],group:'Utama'},{id:'pengaturan-ai',icon:'fa-robot',label:'Pengaturan AI',roles:['admin'],group:'Utama'},{id:'master-area',icon:'fa-map-location-dot',label:'Master Area',roles:['admin'],group:'Master Data'},{id:'master-checksheet',icon:'fa-clipboard-check',label:'Master Checksheet',roles:['admin'],group:'Master Data'},{id:'master-user',icon:'fa-users-gear',label:'Master User',roles:['admin'],group:'Master Data'},{id:'master-kantin',icon:'fa-utensils',label:'Master Kantin',roles:['admin'],group:'Master Data'},{id:'master-jam',icon:'fa-clock',label:'Master Jam Penilaian',roles:['admin'],group:'Master Data'},{id:'jadwal-piket',icon:'fa-calendar-check',label:'Jadwal Piket Kantin',roles:['admin'],group:'Jadwal'},{id:'jadwal-pengawas',icon:'fa-rotate',label:'Rolling Pengawas',roles:['admin'],group:'Jadwal'},{id:'tukar-jadwal',icon:'fa-right-left',label:'Tukar Jadwal Pengawas',roles:['admin','pengawas'],group:'Jadwal'},{id:'input-penilaian',icon:'fa-pen-to-square',label:'Penilaian 5R',roles:['admin','spv'],group:'Input Penilaian'},{id:'input-inisiatif',icon:'fa-lightbulb',label:'Inisiatif',roles:['admin','pengawas','spv','pelaksana'],group:'Input Penilaian'},{id:'input-mystery',icon:'fa-user-secret',label:'Mystery Guest',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'input-piket-kantin',icon:'fa-utensils',label:'Piket Kantin',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'rekap-bulanan',icon:'fa-chart-bar',label:'Rekap Bulanan',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'},{id:'klasemen',icon:'fa-trophy',label:'Klasemen Lomba',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'}];
+var MENU_DEF=[{id:'dashboard',icon:'fa-gauge-high',label:'Dashboard',roles:['admin','pengawas','spv','pelaksana'],group:'Utama'},{id:'preferensi-tampilan',icon:'fa-palette',label:'Preferensi Tampilan',roles:['admin','pengawas','spv','pelaksana'],group:'Utama'},{id:'app-settings',icon:'fa-gear',label:'Pengaturan Aplikasi',roles:['admin'],group:'Utama'},{id:'pengaturan-ai',icon:'fa-robot',label:'Pengaturan AI',roles:['admin'],group:'Utama'},{id:'master-area',icon:'fa-map-location-dot',label:'Master Area',roles:['admin'],group:'Master Data'},{id:'master-checksheet',icon:'fa-clipboard-check',label:'Master Checksheet',roles:['admin'],group:'Master Data'},{id:'master-user',icon:'fa-users-gear',label:'Master User',roles:['admin'],group:'Master Data'},{id:'master-kantin',icon:'fa-utensils',label:'Master Kantin',roles:['admin'],group:'Master Data'},{id:'master-jam',icon:'fa-clock',label:'Master Jam Penilaian',roles:['admin'],group:'Master Data'},{id:'jadwal-piket',icon:'fa-calendar-check',label:'Jadwal Piket Kantin',roles:['admin'],group:'Jadwal'},{id:'input-penilaian',icon:'fa-pen-to-square',label:'Penilaian 5R',roles:['admin','spv'],group:'Input Penilaian'},{id:'input-inisiatif',icon:'fa-lightbulb',label:'Inisiatif',roles:['admin','pengawas','spv','pelaksana'],group:'Input Penilaian'},{id:'input-mystery',icon:'fa-user-secret',label:'Mystery Guest',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'input-piket-kantin',icon:'fa-utensils',label:'Piket Kantin',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'rekap-bulanan',icon:'fa-chart-bar',label:'Rekap Bulanan',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'},{id:'klasemen',icon:'fa-trophy',label:'Klasemen Lomba',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'}];
 var PAGE_TITLES={};MENU_DEF.forEach(function(m){PAGE_TITLES[m.id]=m.label});
 function canAccess(pageId){var m=MENU_DEF.find(function(x){return x.id===pageId});if(!m||!CU)return false;return m.roles.indexOf(CU.role)>=0;}
-function pendingSwapCount(){if(!CU)return 0;var reqs=DB.get('swap_pengawas')||[];return reqs.filter(function(r){return r.status==='pending';}).length;}
-function menuBadgeHtml(m){if(m.id==='tukar-jadwal' && CU && CU.role==='admin'){var c=pendingSwapCount();if(c>0)return '<span class="menu-badge">'+c+'</span>';}return '';}
-function updateMenuBadges(){var el=document.querySelector('.menu-item[data-page="tukar-jadwal"]');if(!el)return;var existing=el.querySelector('.menu-badge');if(CU && CU.role==='admin'){var c=pendingSwapCount();if(c>0){if(existing)existing.textContent=c;else{el.insertAdjacentHTML('beforeend','<span class="menu-badge">'+c+'</span>');}}else if(existing){existing.remove();}}else if(existing){existing.remove();}}
+function menuBadgeHtml(m){return '';}
 function buildMenu(){var html='';var lastGroup='';MENU_DEF.forEach(function(m){if(!canAccess(m.id))return;if(m.group!==lastGroup){lastGroup=m.group;html+='<div class="menu-group"><div class="menu-group-label">'+m.group+'</div>';}html+='<div class="menu-item" data-page="'+m.id+'" title="'+m.label+'"><i class="fas '+m.icon+'"></i><span class="menu-label">'+m.label+'</span>'+menuBadgeHtml(m)+'</div>';});html+='</div>';document.getElementById('menu-container').innerHTML=html;document.querySelectorAll('.menu-item').forEach(function(el){el.addEventListener('click',function(){var pg=el.getAttribute('data-page');if(pg)nav(pg);});});}
 // Ciutkan/lebarkan sidebar (menu) supaya area tabel/foto di Penilaian 5R lebih lega.
 // Preferensi disimpan di localStorage per-browser (bukan per akun), jadi tetap kepilih
@@ -513,12 +508,11 @@ function applySidebarCollapsePref(){
 function buildSidebarUser(){if(!CU){document.getElementById('sidebar-user').innerHTML='';return;}var colors={admin:'#ef4444',pengawas:'#3b82f6',spv:'#f59e0b',pelaksana:'#6366f1'};var initials=CU.name.split(' ').map(function(w){return w[0]}).join('').substring(0,2).toUpperCase();document.getElementById('sidebar-user').innerHTML='<div class="sidebar-avatar" style="background:'+colors[CU.role]+'">'+initials+'</div><div class="sidebar-userinfo"><div class="name">'+CU.name+'</div><div class="role">'+ROLES[CU.role]+'</div></div>';}
 var curPage='dashboard';
 function refreshCU(){if(!CU)return;var fresh=DB.get('users').find(function(x){return x.id===CU.id});if(fresh){CU=fresh;setSession(fresh);}}
-function nav(pg){refreshCU();if(!canAccess(pg)){document.getElementById('content').innerHTML='<div class="no-access"><i class="fas fa-lock"></i><p>Anda tidak memiliki akses.</p></div>';return;}curPage=pg;document.querySelectorAll('.menu-item').forEach(function(m){m.classList.toggle('active',m.getAttribute('data-page')===pg)});document.getElementById('page-title').textContent=PAGE_TITLES[pg]||'';var fn={dashboard:pgDashboard,'preferensi-tampilan':pgPreferensiTampilan,'app-settings':pgAppSettings,'pengaturan-ai':pgPengaturanAI,'master-area':pgMasterArea,'master-checksheet':pgMasterCheck,'master-user':pgMasterUser,'master-kantin':pgMasterKantin,'master-jam':pgMasterJam,'jadwal-piket':pgJadwalPiket,'jadwal-pengawas':pgJadwalPw,'tukar-jadwal':pgTukarJadwal,'input-penilaian':pgInputPen,'input-inisiatif':pgInputIni,'input-mystery':pgInputMys,'input-piket-kantin':pgInputPK,'rekap-bulanan':pgRekap,klasemen:pgKlasemen};if(fn[pg])fn[pg]();else document.getElementById('content').innerHTML='<div class="empty-state"><p>Halaman belum tersedia.</p></div>';document.getElementById('sidebar').classList.remove('open');}
+function nav(pg){refreshCU();if(!canAccess(pg)){document.getElementById('content').innerHTML='<div class="no-access"><i class="fas fa-lock"></i><p>Anda tidak memiliki akses.</p></div>';return;}curPage=pg;document.querySelectorAll('.menu-item').forEach(function(m){m.classList.toggle('active',m.getAttribute('data-page')===pg)});document.getElementById('page-title').textContent=PAGE_TITLES[pg]||'';var fn={dashboard:pgDashboard,'preferensi-tampilan':pgPreferensiTampilan,'app-settings':pgAppSettings,'pengaturan-ai':pgPengaturanAI,'master-area':pgMasterArea,'master-checksheet':pgMasterCheck,'master-user':pgMasterUser,'master-kantin':pgMasterKantin,'master-jam':pgMasterJam,'jadwal-piket':pgJadwalPiket,'input-penilaian':pgInputPen,'input-inisiatif':pgInputIni,'input-mystery':pgInputMys,'input-piket-kantin':pgInputPK,'rekap-bulanan':pgRekap,klasemen:pgKlasemen};if(fn[pg])fn[pg]();else document.getElementById('content').innerHTML='<div class="empty-state"><p>Halaman belum tersedia.</p></div>';document.getElementById('sidebar').classList.remove('open');}
 var _charts={};function mkChart(id,cfg){if(_charts[id]){_charts[id].destroy();delete _charts[id];}var el=document.getElementById(id);if(!el)return;_charts[id]=new Chart(el,cfg);}
 
 function calcScore(areaId,y,m){var area=DB.get('areas').find(function(a){return a.id===areaId});if(!area)return null;var cls=DB.get('checklists').filter(function(c){return c.areaId===areaId});var n=cls.length;if(n===0)return{base:0,initB:0,mysP:0,kantB:0,kantP:0,final:0,area:area};var ppi=100/n;var jam=getJamSettings();var now=new Date();var pen=getAllPenilaian().filter(function(p){return p.areaId===areaId&&p.date.substring(0,7)===mPrefix(y,m)});var dates=allDates(y,m);var daily=[];dates.forEach(function(date){if(!isActiveDay(date,jam))return;var shifts=[];['pagi','siang'].forEach(function(shift){var dl=pen_deadlines(date,shift,jam);if(now<dl.upload)return;var rec=pen.find(function(p){return p.date===date&&p.shift===shift});var t=0;cls.forEach(function(cl){var it=rec?rec.items.find(function(i){return i.clId===cl.id}):null;if(!it)it={clId:cl.id,photo:null,ai:null,photoPerbaikan:null,aiPerbaikan:null};var st=pen_computeStatus(it,date,shift,jam,now);if(st.poin==='full')t+=ppi;else if(st.poin==='minus')t-=ppi;});shifts.push(t);});if(shifts.length>0)daily.push(shifts.reduce(function(a,b){return a+b},0)/shifts.length);});var base=daily.length>0?daily.reduce(function(a,b){return a+b},0)/daily.length:0;var pf=mPrefix(y,m);var initB=DB.get('inisiatif').filter(function(i){return i.areaId===areaId&&i.date.substring(0,7)===pf}).length*25;var mysP=DB.get('mystery').filter(function(x){return x.areaId===areaId&&x.date.substring(0,7)===pf}).length*25;var ks=getKantinSettings();var kantB=0,kantP=0;DB.get('pk_result').forEach(function(r){if(r.date.substring(0,7)!==pf)return;var okVerif=ks.wajibVerifikasi?!!r.verified:true;if(!okVerif)return;var duty=getDuty(r.date,r.shift);if(duty!==areaId)return;if(r.clean)kantB+=ks.bonus;else kantP+=ks.penalty;});var fin=base+initB-mysP+kantB-kantP;if(area.type==='non-lomba'&&fin>100)fin=100;return{base:Math.round(base*100)/100,initB:initB,mysP:mysP,kantB:kantB,kantP:kantP,final:Math.round(fin*100)/100,area:area};}
 function getDuty(date,shift){var s=DB.get('piket_kantin').find(function(p){return p.date===date&&p.shift===shift});return s?s.areaId:null;}
-function getPwForDate(dateStr){var ws=weekStart(dateStr);var s=DB.get('pw_schedule').find(function(x){return x.weekStart===ws});if(!s)return null;return DB.get('users').find(function(u){return u.id===s.pwId&&u.role==='pengawas'})||null;}
 
 function getAiSettings(){var s=DB.get('ai_settings');if(!s||Array.isArray(s))s={};return{model:(s.model||'gemini-3.6-flash')};}
 function pgPengaturanAI(){
@@ -908,111 +902,6 @@ function genRollingPiket(){
 }
 function savePKEv(date,shift,areaId){var list=DB.get('piket_kantin').filter(function(s){return!(s.date===date&&s.shift===shift)});if(areaId)list.push({id:DB.uid(),areaId:areaId,date:date,shift:shift,ts:Date.now()});DB.set('piket_kantin',list);}
 function bulkPK(){var aId=document.getElementById('bp-a').value;var shift=document.getElementById('bp-s').value;var s=parseInt(document.getElementById('bp-ds').value)||1;var e=parseInt(document.getElementById('bp-de').value)||daysInMonth(_pkY,_pkM);if(!aId){toast('Pilih area','error');return;}var jam=getJamSettings();var list=DB.get('piket_kantin');var skipped=0;for(var d=s;d<=e;d++){var ds=_pkY+'-'+String(_pkM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');if(!isActiveDay(ds,jam)){skipped++;continue;}if(shift==='pagi'||shift==='both'){list=list.filter(function(x){return!(x.date===ds&&x.shift==='pagi')});list.push({id:DB.uid(),areaId:aId,date:ds,shift:'pagi',ts:Date.now()});}if(shift==='sore'||shift==='both'){list=list.filter(function(x){return!(x.date===ds&&x.shift==='sore')});list.push({id:DB.uid(),areaId:aId,date:ds,shift:'sore',ts:Date.now()});}}DB.set('piket_kantin',list);toast('Di-assign'+(skipped>0?' ('+skipped+' hari libur dilewati)':''));pgJadwalPiket();}
-
-var _jpY,_jpM;
-function pgJadwalPw(){var now=new Date();if(_jpY===undefined){_jpY=now.getFullYear();_jpM=now.getMonth();}var users=DB.get('users');var depts=[...new Set(users.filter(function(u){return u.role==='pengawas'}).map(function(u){return u.dept}))].filter(Boolean);var h='<div class="card"><div class="card-header"><div class="card-title">Rolling Dept. Pengawas Harian</div><div style="display:flex;gap:5px;align-items:center"><button class="btn btn-outline btn-sm" onclick="_jpM=(_jpM+11)%12;_jpY=_jpM===11?_jpY-1:_jpY;pgJadwalPw()"><i class="fas fa-chevron-left"></i></button><span style="font-weight:600;font-size:11px;min-width:110px;text-align:center">'+BULAN[_jpM]+' '+_jpY+'</span><button class="btn btn-outline btn-sm" onclick="_jpM=(_jpM+1)%12;_jpY=_jpM===0?_jpY+1:_jpY;pgJadwalPw()"><i class="fas fa-chevron-right"></i></button></div></div>';if(depts.length>0){h+='<div class="info-box info-warn"><i class="fas fa-shuffle"></i>Satu Departemen Pengawas akan ditugaskan untuk 1 hari penuh (Pagi/Sore) secara bergantian dan acak.</div>';h+='<button class="btn btn-primary" onclick="genRollingDept()" style="margin-bottom:15px"><i class="fas fa-shuffle"></i> Generate Rolling Dept</button>';}else{h+='<div class="info-box info-warn"><i class="fas fa-exclamation-triangle"></i>Belum ada user dengan role Pengawas.</div>';}h+='<div id="rolling-container"></div></div>';document.getElementById('content').innerHTML=h;renderRollingDept();}
-function genRollingDept(){var users=DB.get('users');var depts=[...new Set(users.filter(function(u){return u.role==='pengawas'}).map(function(u){return u.dept}))].filter(Boolean);var n=daysInMonth(_jpY,_jpM);for(var i=depts.length-1;i>0;i--){var j=Math.floor(Math.random()*(i+1));var temp=depts[i];depts[i]=depts[j];depts[j]=temp;}var newSchedule=[];var idx=0;for(var d=1;d<=n;d++){var ds=_jpY+'-'+String(_jpM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');newSchedule.push({id:DB.uid(),date:ds,dept:depts[idx],shift:'Pagi/Sore'});idx++;if(idx>=depts.length)idx=0;}DB.set('rolling_dept_pengawas',newSchedule);toast('Rolling Departemen Pengawas berhasil di-acak!');renderRollingDept();logAct('Generate rolling dept pengawas '+BULAN[_jpM]+' '+_jpY);}
-function renderRollingDept(){var schedule=DB.get('rolling_dept_pengawas').filter(function(s){return s.date.substring(0,7)===mPrefix(_jpY,_jpM)});var container=document.getElementById('rolling-container');if(!container)return;if(schedule.length===0){container.innerHTML='<div class="empty-state"><i class="fas fa-rotate"></i><p>Belum ada jadwal. Klik Generate.</p></div>';return;}var html='<table><thead><tr><th style="width:120px">Tanggal</th><th style="width:100px">Shift</th><th>Departemen Pengawas Yang Bertugas</th></tr></thead><tbody>';schedule.forEach(function(s){html+='<tr><td>'+fmtD(s.date)+'</td><td><span class="badge badge-spv">'+s.shift+'</span></td><td style="font-weight:700;color:var(--primary)"><i class="fas fa-building"></i> '+s.dept+'</td></tr>';});html+='</tbody></table>';container.innerHTML=html;}
-
-// ===================== TUKAR JADWAL PENGAWAS =====================
-var _tjD1='',_tjDept2='',_tjD2='',_tjReasonVal='';
-function tjPengawasDepts(){return [...new Set(DB.get('users').filter(function(u){return u.role==='pengawas'}).map(function(u){return u.dept}))].filter(Boolean);}
-function tjUpcoming(dept,excludeDate){var td=todayStr();return DB.get('rolling_dept_pengawas').filter(function(s){return s.dept===dept && s.date>=td && s.date!==excludeDate;}).sort(function(a,b){return a.date<b.date?-1:1;});}
-function pgTukarJadwal(){
-  var reqs=DB.get('swap_pengawas')||[];
-  var h='<div class="card"><div class="card-header"><div class="card-title"><i class="fas fa-right-left" style="color:var(--primary)"></i>Tukar Jadwal Pengawas</div></div>';
-  h+='<div class="info-box info-ok"><i class="fas fa-circle-info"></i>Contoh: hari ini jadwal Anda (mis. HR) berhalangan, ajukan tukar dengan departemen lain (mis. PPIC) yang bertugas di tanggal lain. Jika disetujui Admin, kedua jadwal akan otomatis tertukar di Rolling Pengawas.</div>';
-
-  if(CU.role==='pengawas'){
-    var myDept=CU.dept;
-    var myUpcoming=tjUpcoming(myDept,null);
-    var otherDepts=tjPengawasDepts().filter(function(d){return d!==myDept;});
-    if(!_tjD1 && myUpcoming.length>0) _tjD1=myUpcoming[0].date;
-    if(!_tjDept2 && otherDepts.length>0) _tjDept2=otherDepts[0];
-    var targetUpcoming=_tjDept2?tjUpcoming(_tjDept2,_tjD1):[];
-    if((!_tjD2 || !targetUpcoming.some(function(t){return t.date===_tjD2;})) && targetUpcoming.length>0) _tjD2=targetUpcoming[0].date;
-
-    h+='<div class="pen-toolbar" style="align-items:start">';
-    if(myUpcoming.length===0){
-      h+='<div class="empty-state" style="width:100%"><i class="fas fa-calendar-xmark"></i><p>Departemen Anda ('+myDept+') tidak punya jadwal bertugas mendatang di Rolling Pengawas.</p></div>';
-    }else if(otherDepts.length===0){
-      h+='<div class="empty-state" style="width:100%"><i class="fas fa-users-slash"></i><p>Belum ada departemen pengawas lain untuk ditukar.</p></div>';
-    }else{
-      h+='<div class="form-group" style="min-width:170px"><label class="form-label"><i class="fas fa-calendar-day"></i> Tanggal Saya Bertugas ('+myDept+')</label><select class="form-select" onchange="_tjD1=this.value;_tjD2=\'\';pgTukarJadwal()">';
-      myUpcoming.forEach(function(s){h+='<option value="'+s.date+'"'+(s.date===_tjD1?' selected':'')+'>'+fmtD(s.date)+'</option>';});
-      h+='</select></div>';
-      h+='<div class="form-group" style="min-width:170px"><label class="form-label"><i class="fas fa-building"></i> Tukar Dengan Departemen</label><select class="form-select" onchange="_tjDept2=this.value;_tjD2=\'\';pgTukarJadwal()">';
-      otherDepts.forEach(function(d){h+='<option value="'+d+'"'+(d===_tjDept2?' selected':'')+'>'+d+'</option>';});
-      h+='</select></div>';
-      h+='<div class="form-group" style="min-width:170px"><label class="form-label"><i class="fas fa-calendar-day"></i> Tanggal Dept Tersebut Bertugas</label><select class="form-select" onchange="_tjD2=this.value">';
-      if(targetUpcoming.length===0) h+='<option value="">-- Tidak ada jadwal --</option>';
-      else targetUpcoming.forEach(function(s){h+='<option value="'+s.date+'"'+(s.date===_tjD2?' selected':'')+'>'+fmtD(s.date)+'</option>';});
-      h+='</select></div>';
-      h+='</div>';
-      h+='<div class="form-group"><label class="form-label"><i class="fas fa-comment"></i> Alasan Tukar</label><textarea class="form-textarea" id="f-tjr" placeholder="Contoh: berhalangan hadir karena ada keperluan mendadak">'+_tjReasonVal+'</textarea></div>';
-      h+='<div style="text-align:right"><button class="btn btn-primary" onclick="ajukanTukar()"'+(targetUpcoming.length===0?' disabled':'')+'><i class="fas fa-paper-plane"></i> Ajukan Tukar Jadwal</button></div>';
-    }
-    h+='</div>';
-  }
-
-  // Riwayat / daftar pengajuan
-  var listReqs=reqs.slice().sort(function(a,b){return b.ts-a.ts;});
-  if(CU.role==='pengawas') listReqs=listReqs.filter(function(r){return r.requestedBy===CU.id;});
-  h+='<div class="card-header" style="margin-top:4px"><div class="card-title" style="font-size:12.5px"><i class="fas fa-clock-rotate-left"></i>'+(CU.role==='admin'?'Semua Pengajuan Tukar Jadwal':'Riwayat Pengajuan Saya')+'</div></div>';
-  if(listReqs.length===0){
-    h+='<div class="empty-state"><i class="fas fa-inbox"></i><p>Belum ada pengajuan tukar jadwal.</p></div>';
-  }else{
-    h+='<table><thead><tr><th>Diajukan</th><th>Pemohon</th><th>Dari</th><th>Ke</th><th>Alasan</th><th>Status</th>'+(CU.role==='admin'?'<th>Aksi</th>':'<th></th>')+'</tr></thead><tbody>';
-    listReqs.forEach(function(r){
-      var stBadge=r.status==='approved'?'<span class="badge badge-ok"><i class="fas fa-check"></i> Disetujui</span>':r.status==='rejected'?'<span class="badge badge-tidak"><i class="fas fa-xmark"></i> Ditolak</span>':'<span class="badge badge-skip"><i class="fas fa-hourglass-half"></i> Menunggu</span>';
-      h+='<tr><td style="font-size:10.5px;color:var(--text-muted)">'+fmtD(r.date? r.date : new Date(r.ts).toISOString().substring(0,10))+'</td>';
-      h+='<td style="font-weight:600">'+(r.requesterName||'-')+'</td>';
-      h+='<td>'+fmtD(r.fromDate)+'<br><span class="badge badge-spv">'+r.fromDept+'</span></td>';
-      h+='<td>'+fmtD(r.toDate)+'<br><span class="badge badge-spv">'+r.toDept+'</span></td>';
-      h+='<td style="max-width:180px;font-size:11px">'+r.reason+'</td>';
-      h+='<td>'+stBadge+'</td>';
-      if(CU.role==='admin'){
-        if(r.status==='pending') h+='<td style="white-space:nowrap"><button class="btn btn-primary btn-sm" onclick="putusTukar(\''+r.id+'\',\'approved\')"><i class="fas fa-check"></i></button> <button class="btn btn-danger btn-sm" onclick="putusTukar(\''+r.id+'\',\'rejected\')"><i class="fas fa-xmark"></i></button></td>';
-        else h+='<td style="font-size:10px;color:var(--text-muted)">-</td>';
-      }else{
-        h+='<td>'+(r.status==='pending'?'<button class="btn btn-outline btn-sm" onclick="batalTukar(\''+r.id+'\')"><i class="fas fa-ban"></i> Batal</button>':'')+'</td>';
-      }
-      h+='</tr>';
-    });
-    h+='</tbody></table>';
-  }
-  h+='</div>';
-  document.getElementById('content').innerHTML=h;
-}
-function ajukanTukar(){
-  var reason=(document.getElementById('f-tjr').value||'').trim();
-  _tjReasonVal=reason;
-  if(!_tjD1||!_tjDept2||!_tjD2){toast('Lengkapi tanggal dan departemen tujuan','error');return;}
-  if(!reason){toast('Alasan wajib diisi','error');return;}
-  var reqs=DB.get('swap_pengawas')||[];
-  reqs.push({id:DB.uid(),fromDate:_tjD1,fromDept:CU.dept,toDate:_tjD2,toDept:_tjDept2,requestedBy:CU.id,requesterName:CU.name,reason:reason,status:'pending',ts:Date.now()});
-  DB.set('swap_pengawas',reqs,function(ok){if(ok){toast('Pengajuan tukar jadwal terkirim');logAct('Ajukan tukar jadwal pengawas: '+_tjD1+' <-> '+_tjD2);_tjReasonVal='';_tjD1='';_tjDept2='';_tjD2='';pgTukarJadwal();updateMenuBadges();}});
-}
-function batalTukar(id){
-  var reqs=DB.get('swap_pengawas')||[];var r=reqs.find(function(x){return x.id===id});
-  if(!r||r.requestedBy!==CU.id||r.status!=='pending')return;
-  reqs=reqs.filter(function(x){return x.id!==id});
-  DB.set('swap_pengawas',reqs,function(ok){if(ok){toast('Pengajuan dibatalkan');pgTukarJadwal();updateMenuBadges();}});
-}
-function putusTukar(id,decision){
-  var reqs=DB.get('swap_pengawas')||[];var r=reqs.find(function(x){return x.id===id});
-  if(!r||r.status!=='pending')return;
-  if(decision==='approved'){
-    var schedule=DB.get('rolling_dept_pengawas');
-    var e1=schedule.find(function(s){return s.date===r.fromDate && s.dept===r.fromDept;});
-    var e2=schedule.find(function(s){return s.date===r.toDate && s.dept===r.toDept;});
-    if(!e1||!e2){toast('Jadwal asal/tujuan sudah berubah, tidak bisa ditukar','error');return;}
-    e1.dept=r.toDept;e2.dept=r.fromDept;
-    DB.set('rolling_dept_pengawas',schedule);
-  }
-  r.status=decision;r.decidedBy=CU.id;r.decidedTs=Date.now();
-  DB.set('swap_pengawas',reqs,function(ok){if(ok){toast(decision==='approved'?'Tukar jadwal disetujui & jadwal diperbarui':'Pengajuan ditolak');logAct((decision==='approved'?'Setujui':'Tolak')+' tukar jadwal pengawas '+r.fromDate+' <-> '+r.toDate);pgTukarJadwal();updateMenuBadges();if(_jpY!==undefined)renderRollingDept();}});
-}
 
 var _ipA='',_ipD='',_ipS='pagi';
 // CATATAN: Penilaian 5R sekarang HANYA diisi oleh SPV, 2x sehari (Pagi & Sore), dan dinilai
