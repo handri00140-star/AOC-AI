@@ -18,7 +18,18 @@ body{background:var(--bg);color:var(--text);overflow:hidden;height:100vh}
 .login-logo-icon{width:48px;height:48px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));border-radius:12px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:18px;color:#fff;flex-shrink:0}
 .login-logo-text{font-weight:800;font-size:17px;line-height:1.3;color:var(--text)}.login-logo-text span{color:var(--primary)}
 .login-error{background:#fee2e2;color:#991b1b;padding:8px 12px;border-radius:8px;font-size:12px;font-weight:600;margin-bottom:12px;display:none;align-items:center;gap:6px}.login-error.show{display:flex}
-.sidebar{width:260px;min-width:260px;background:var(--sidebar);color:#e2e8f0;display:flex;flex-direction:column;height:100vh;overflow-y:auto;overflow-x:hidden;z-index:50}
+.sidebar{width:260px;min-width:260px;background:var(--sidebar);color:#e2e8f0;display:flex;flex-direction:column;height:100vh;overflow-y:auto;overflow-x:hidden;z-index:50;transition:width .2s,min-width .2s}
+.sidebar.collapsed{width:64px;min-width:64px}
+.sidebar.collapsed .logo{justify-content:center;padding:16px 8px}
+.sidebar.collapsed .menu-item{justify-content:center;padding:10px 0}
+.sidebar.collapsed .menu-group-label{display:none}
+.sidebar.collapsed .menu-label{display:none}
+.sidebar.collapsed .sidebar-user{justify-content:center;padding:12px 4px}
+.sidebar.collapsed .sidebar-userinfo{display:none}
+.sidebar-toggle-btn{display:flex;align-items:center;gap:10px;padding:9px 16px;cursor:pointer;background:none;border:none;color:#94a3b8;font-size:11.5px;font-weight:600;width:100%;text-align:left;border-bottom:1px solid #1e293b;transition:all .15s}
+.sidebar-toggle-btn:hover{background:var(--sidebar-hover);color:#fff}
+.sidebar.collapsed .sidebar-toggle-btn{justify-content:center;padding:9px 0}
+@media(max-width:768px){.sidebar-toggle-btn{display:none}}
 .sidebar::-webkit-scrollbar{width:4px}.sidebar::-webkit-scrollbar-thumb{background:#334155;border-radius:4px}
 .sidebar .logo{padding:16px 14px;border-bottom:1px solid #1e293b;display:flex;align-items:center;gap:10px}
 .sidebar .logo-icon{width:38px;height:38px;background:linear-gradient(135deg,var(--primary),var(--primary-dark));border-radius:9px;display:flex;align-items:center;justify-content:center;font-weight:900;font-size:14px;color:#fff;flex-shrink:0}
@@ -77,6 +88,11 @@ td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;vertica
 .modal-close{width:28px;height:28px;border-radius:6px;border:none;background:#f1f5f9;cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:13px;color:var(--text-muted);transition:all .15s}
 .modal-close:hover{background:#fee2e2;color:var(--danger)}
 .modal-body{padding:18px}.modal-footer{padding:10px 18px;border-top:1px solid var(--border);display:flex;justify-content:flex-end;gap:6px}
+.photo-lightbox{position:fixed;inset:0;background:rgba(0,0,0,.9);z-index:200;display:flex;align-items:center;justify-content:center;opacity:0;pointer-events:none;transition:opacity .2s;padding:20px}
+.photo-lightbox.show{opacity:1;pointer-events:auto}
+.photo-lightbox img{max-width:100%;max-height:100%;object-fit:contain;border-radius:6px;cursor:zoom-out}
+.photo-lightbox-close{position:absolute;top:16px;right:16px;width:42px;height:42px;border-radius:50%;border:none;background:rgba(255,255,255,.15);color:#fff;font-size:18px;cursor:pointer;display:flex;align-items:center;justify-content:center;transition:background .15s}
+.photo-lightbox-close:hover{background:rgba(255,255,255,.3)}
 .toast-container{position:fixed;top:14px;right:14px;z-index:200;display:flex;flex-direction:column;gap:6px;pointer-events:none}
 .toast{padding:10px 14px;border-radius:8px;font-size:11.5px;font-weight:600;color:#fff;display:flex;align-items:center;gap:8px;animation:toastIn .3s ease;box-shadow:0 6px 24px rgba(0,0,0,.15);min-width:240px;pointer-events:auto}
 .toast-success{background:var(--primary)}.toast-error{background:#ef4444}.toast-info{background:var(--primary-light)}
@@ -99,7 +115,7 @@ td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;vertica
 .info-warn{background:#fffbeb;border:1px solid #fde68a;color:#92400e}
 .info-ok{background:#eff6ff;border:1px solid #bfdbfe;color:#1e40af}
 .chk-section{border:1px solid var(--border);border-radius:10px;overflow:hidden;margin-bottom:14px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
-.chk-grid{display:grid;grid-template-columns:1fr 90px 90px 220px 200px;gap:0}
+.chk-grid{display:grid;grid-template-columns:1fr 150px 150px 220px 150px;gap:0}
 .chk-head{padding:9px 10px;background:#f8fafc;font-size:9px;text-transform:uppercase;letter-spacing:.5px;font-weight:700;color:var(--text-muted);border-bottom:2px solid var(--border);text-align:center;position:sticky;top:0}
 .chk-head:first-child{text-align:left}
 .chk-cat{background:linear-gradient(135deg,var(--primary-dark),var(--primary));padding:8px 12px;font-weight:700;font-size:11px;color:#fff;display:flex;align-items:center;gap:7px;letter-spacing:.3px}
@@ -164,6 +180,7 @@ td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;vertica
 <div id="app" style="display:flex;height:100vh">
 <aside class="sidebar" id="sidebar">
   <div class="logo"><div class="logo-icon">5R</div><div class="logo-text">ERP Penilaian<br><span>Program 5R</span></div></div>
+  <button class="sidebar-toggle-btn" id="sidebar-toggle-btn" onclick="toggleSidebarCollapse()" title="Ciutkan/Lebarkan Menu"><i class="fas fa-angles-left"></i><span class="menu-label">Ciutkan Menu</span></button>
   <div id="menu-container"></div>
   <div class="sidebar-user" id="sidebar-user"></div>
 </aside>
@@ -182,6 +199,7 @@ td{padding:8px 10px;border-bottom:1px solid var(--border);font-size:12px;vertica
 </div>
 </div>
 <div class="modal-overlay" id="modal"><div class="modal-box"><div class="modal-header"><h3 id="modal-title"></h3><button class="modal-close" onclick="hideModal()"><i class="fas fa-xmark"></i></button></div><div class="modal-body" id="modal-body"></div><div class="modal-footer" id="modal-footer"></div></div></div>
+<div class="photo-lightbox" id="photo-lightbox" onclick="closePhotoLightbox()"><button class="photo-lightbox-close" onclick="closePhotoLightbox()"><i class="fas fa-xmark"></i></button><img id="photo-lightbox-img" src="" onclick="event.stopPropagation()"></div>
 <div class="toast-container" id="toast-box"></div>
 <script>
 // ==== BACKEND: SUPABASE (tanpa server sendiri, langsung REST API Postgres) ====
@@ -259,7 +277,7 @@ function detectPatterns(){
   var counter={};
   pen.forEach(function(p){
     (p.items||[]).forEach(function(it){
-      var nok=(it.picAi&&it.picAi.result==='nok')||(it.spvAi&&it.spvAi.result==='nok');
+      var nok=(it.ai&&!it.ai.failed&&it.ai.result==='nok')||(it.aiPerbaikan&&!it.aiPerbaikan.failed&&it.aiPerbaikan.result==='nok');
       if(nok){var key=p.areaId+'|'+it.clId;counter[key]=(counter[key]||0)+1;}
     });
   });
@@ -290,8 +308,9 @@ function toast(msg,type){type=type||'success';var c=document.getElementById('toa
 function showModal(title,body,footer){document.getElementById('modal-title').textContent=title;document.getElementById('modal-body').innerHTML=body;document.getElementById('modal-footer').innerHTML=footer||'';document.getElementById('modal').classList.add('show')}
 function hideModal(){document.getElementById('modal').classList.remove('show')}
 // FIX: window.open(dataURL,'_blank') diblokir Chrome versi baru untuk foto berformat data:
-// URL (base64) -- tab baru jadi blank. Ganti dengan modal di halaman yang sama, lebih andal.
-function viewPhoto(src){showModal('Pratinjau Foto','<img src="'+src+'" style="width:100%;border-radius:8px;display:block">','<button class="btn btn-outline" onclick="hideModal()">Tutup</button>');}
+// URL (base64) -- tab baru jadi blank. Ganti dengan lightbox full-screen di halaman yang sama.
+function viewPhoto(src){document.getElementById('photo-lightbox-img').src=src;document.getElementById('photo-lightbox').classList.add('show');}
+function closePhotoLightbox(){document.getElementById('photo-lightbox').classList.remove('show');document.getElementById('photo-lightbox-img').src='';}
 document.getElementById('modal').addEventListener('click',function(e){if(e.target===this)hideModal()});
 function logAct(desc){var a=DB.get('activities');a.push({id:DB.uid(),desc:desc,date:todayStr(),ts:Date.now()});if(a.length>80)a.splice(0,a.length-80);DB.set('activities',a)}
 
@@ -342,7 +361,7 @@ function aiAssessPhoto(itemDesc,photoDataUrl,refPhoto,cb){
   });
 }
 function pen_getRecord(){return penGetRecord(_ipA,_ipD,_ipS);}
-function pen_getItems(cls,existing){return cls.map(function(c){var it=existing?existing.items.find(function(i){return i.clId===c.id}):null;return it||{clId:c.id,picPhoto:null,picAi:null,spvPhoto:null,spvAi:null,pwStatus:'pending'};});}
+function pen_getItems(cls,existing){return cls.map(function(c){var it=existing?existing.items.find(function(i){return i.clId===c.id}):null;return it||{clId:c.id,photo:null,ai:null,photoPerbaikan:null,aiPerbaikan:null};});}
 function pen_saveItems(items,cb){var rec={id:DB.uid(),areaId:_ipA,date:_ipD,shift:_ipS,items:items,submittedBy:CU.id,ts:Date.now()};DB.set(penKey(_ipA,_ipD,_ipS),rec,cb);}
 // --- Alur Upload Foto 2 Langkah: Pilih Foto (staging, belum tersimpan) -> Simpan Foto ---
 // (baru menyimpan ke server & menjalankan AI setelah tombol "Simpan Foto" diklik).
@@ -355,9 +374,9 @@ function onPickPhotoStage(inputEl,clId,role){
   var file=inputEl.files[0];if(!file)return;
   var existingChk=pen_getRecord();
   var itChk=existingChk?existingChk.items.find(function(i){return i.clId===clId;}):null;
-  var savedPhoto=itChk?(role==='pic'?itChk.picPhoto:itChk.spvPhoto):null;
-  var savedAi=itChk?(role==='pic'?itChk.picAi:itChk.spvAi):null;
-  // Pelaksana & SPV disamakan: begitu foto tersimpan DAN sudah dinilai AI, tidak bisa ganti lagi.
+  var savedPhoto=itChk?(role==='utama'?itChk.photo:itChk.photoPerbaikan):null;
+  var savedAi=itChk?(role==='utama'?itChk.ai:itChk.aiPerbaikan):null;
+  // Begitu foto tersimpan DAN sudah dinilai AI, tidak bisa ganti lagi oleh SPV.
   // Admin tetap bisa mengoreksi kapan saja.
   if(savedPhoto && savedAi && !savedAi.failed && CU.role!=='admin'){
     toast('Foto ini sudah tersimpan & dinilai AI, tidak bisa diganti lagi.','error');inputEl.value='';return;
@@ -380,8 +399,7 @@ function saveStagedPhoto(clId,role){
   var items=pen_getItems(cls,existing);
   var it=items.find(function(i){return i.clId===clId});
   var clObj=cls.find(function(c){return c.id===clId});
-  if(role==='pic'){it.picPhoto=dataUrl;it.picAi=null;}else{it.spvPhoto=dataUrl;it.spvAi=null;}
-  it.pwStatus='pending';it.pwApprovedBy=null;it.pwApprovedAt=null;
+  if(role==='utama'){it.photo=dataUrl;it.ai=null;}else{it.photoPerbaikan=dataUrl;it.aiPerbaikan=null;}
   pen_saveItems(items);
   delete _stagedPhotos[stagedKey(clId,role)];
   pgInputPen();
@@ -389,7 +407,7 @@ function saveStagedPhoto(clId,role){
   aiAssessPhoto(clObj?clObj.desc:'',dataUrl,clObj?clObj.refPhoto:null,function(aiRes){
     var rec=pen_getRecord();if(!rec)return;
     var it2=rec.items.find(function(i){return i.clId===clId});if(!it2)return;
-    if(role==='pic')it2.picAi=aiRes;else it2.spvAi=aiRes;
+    if(role==='utama')it2.ai=aiRes;else it2.aiPerbaikan=aiRes;
     DB.set(penKey(rec.areaId,rec.date,rec.shift),rec);
     if(!aiRes.failed) toast('AI menilai foto: '+(aiRes.result==='ok'?'Sesuai standar':'Tidak sesuai standar'),aiRes.result==='ok'?'success':'error');
     if(curPage==='input-penilaian')pgInputPen();
@@ -399,28 +417,21 @@ function retryAiForItem(clId,role){
   // Foto SUDAH tersimpan tapi AI gagal/timeout sebelumnya -- nilai ulang tanpa perlu upload ulang.
   var rec=pen_getRecord();if(!rec)return;
   var it=rec.items.find(function(i){return i.clId===clId});if(!it)return;
-  var photo=role==='pic'?it.picPhoto:it.spvPhoto;
+  var photo=role==='utama'?it.photo:it.photoPerbaikan;
   if(!photo){toast('Belum ada foto tersimpan untuk item ini.','error');return;}
   var cls=DB.get('checklists').filter(function(c){return c.areaId===_ipA});
   var clObj=cls.find(function(c){return c.id===clId});
-  if(role==='pic')it.picAi=null;else it.spvAi=null;
+  if(role==='utama')it.ai=null;else it.aiPerbaikan=null;
   DB.set(penKey(rec.areaId,rec.date,rec.shift),rec);
   pgInputPen();
   aiAssessPhoto(clObj?clObj.desc:'',photo,clObj?clObj.refPhoto:null,function(aiRes){
     var rec2=pen_getRecord();if(!rec2)return;
     var it2=rec2.items.find(function(i){return i.clId===clId});if(!it2)return;
-    if(role==='pic')it2.picAi=aiRes;else it2.spvAi=aiRes;
+    if(role==='utama')it2.ai=aiRes;else it2.aiPerbaikan=aiRes;
     DB.set(penKey(rec2.areaId,rec2.date,rec2.shift),rec2);
     if(!aiRes.failed) toast('AI menilai foto: '+(aiRes.result==='ok'?'Sesuai standar':'Tidak sesuai standar'),aiRes.result==='ok'?'success':'error');
     if(curPage==='input-penilaian')pgInputPen();
   });
-}
-function pengawasDecide(clId,decision){
-  var rec=pen_getRecord();if(!rec)return;
-  var it=rec.items.find(function(i){return i.clId===clId});if(!it||!it.picAi||it.picAi.failed||!it.spvAi||it.spvAi.failed)return;
-  it.pwStatus=decision;it.pwApprovedBy=CU.name;it.pwApprovedAt=Date.now();
-  DB.set(penKey(rec.areaId,rec.date,rec.shift),rec,function(ok){if(ok){toast(decision==='ok'?'Item dikonfirmasi OK':'Item dikonfirmasi Tidak OK');logAct('Konfirmasi Pengawas ('+decision.toUpperCase()+') item penilaian '+_ipD+' shift '+_ipS);}});
-  pgInputPen();
 }
 function ensureAdmin(){var users=DB.get('users');var found=false;for(var i=0;i<users.length;i++){if(users[i].username==='admin'){found=true;break;}}if(!found){users.push({id:'admin_default',name:'Administrator',username:'admin',password:'admin123',dept:'GM',role:'admin',areas:[],ts:Date.now()});DB.set('users',users);}}
 
@@ -461,7 +472,7 @@ function seedFromLogin(){
   var rollingSeed=[];var idx=0;for(var d=1;d<=n;d++){var ds=y+'-'+String(m+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');rollingSeed.push({id:DB.uid(),date:ds,dept:depts[idx],shift:'Pagi/Sore'});idx++;if(idx>=depts.length)idx=0;}DB.set('rolling_dept_pengawas',rollingSeed);
   var SEED_PHOTO='data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNkYAAAAAYAAjCB0C8AAAAASUVORK5CYII=';
   var pen=[];
-  areas.forEach(function(a){var aCls=cls.filter(function(c){return c.areaId===a.id});['pagi','siang'].forEach(function(shift){var items=aCls.map(function(cl,i){var okPic=(i%5!==3);var okSpv=(i%7!==5);return{clId:cl.id,picPhoto:SEED_PHOTO,picAi:{result:okPic?'ok':'nok',note:'Data contoh',ts:1},spvPhoto:SEED_PHOTO,spvAi:{result:okSpv?'ok':'nok',note:'Data contoh',ts:1},pwStatus:(okPic&&okSpv)?'ok':'nok'};});pen.push({id:DB.uid(),areaId:a.id,date:todayStr(),shift:shift,items:items,submittedBy:'admin_default',ts:Date.now()});});});
+  areas.forEach(function(a){var aCls=cls.filter(function(c){return c.areaId===a.id});['pagi','siang'].forEach(function(shift){var items=aCls.map(function(cl,i){var ok=(i%5!==3);if(ok){return{clId:cl.id,photo:SEED_PHOTO,ai:{result:'ok',note:'Data contoh',ts:1},photoPerbaikan:null,aiPerbaikan:null};}var fixed=(i%2===0);if(fixed){return{clId:cl.id,photo:SEED_PHOTO,ai:{result:'nok',note:'Data contoh - awal tidak sesuai standar',ts:1},photoPerbaikan:SEED_PHOTO,aiPerbaikan:{result:'ok',note:'Data contoh - sudah diperbaiki',ts:1}};}return{clId:cl.id,photo:SEED_PHOTO,ai:{result:'nok',note:'Data contoh - tidak sesuai standar',ts:1},photoPerbaikan:null,aiPerbaikan:null};});pen.push({id:DB.uid(),areaId:a.id,date:todayStr(),shift:shift,items:items,submittedBy:'admin_default',ts:Date.now()});});});
   pen.forEach(function(rec){DB.set(penKey(rec.areaId,rec.date,rec.shift),rec);});
   DB.set('inisiatif',[{id:DB.uid(),areaId:'a1',date:todayStr(),desc:'Menemukan kabel terkelupas di area Line B',reporter:'Andi Pratama',ts:1}]);
   DB.set('mystery',[{id:DB.uid(),areaId:'a3',date:todayStr(),desc:'Alat tidak tersimpan di tempatnya setelah jam kerja',ts:1}]);DB.set('pk_result',[]);
@@ -469,25 +480,43 @@ function seedFromLogin(){
 }
 
 function doLogin(){var username=document.getElementById('login-user').value.trim().toLowerCase();var password=document.getElementById('login-pass').value;doLoginDirect(username,password);}
-function doLoginDirect(username,password){var users=DB.get('users');var found=null;for(var i=0;i<users.length;i++){if(users[i].username.toLowerCase()===username.toLowerCase()&&users[i].password===password){found=users[i];break;}}if(!found){var errEl=document.getElementById('login-error');document.getElementById('login-err-msg').textContent='Username atau password salah';errEl.classList.add('show');return;}CU=found;setSession(found);applyThemeColor(computeEffectiveThemeColor());document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='flex';buildMenu();buildSidebarUser();nav('dashboard');}
+function doLoginDirect(username,password){var users=DB.get('users');var found=null;for(var i=0;i<users.length;i++){if(users[i].username.toLowerCase()===username.toLowerCase()&&users[i].password===password){found=users[i];break;}}if(!found){var errEl=document.getElementById('login-error');document.getElementById('login-err-msg').textContent='Username atau password salah';errEl.classList.add('show');return;}CU=found;setSession(found);applyThemeColor(computeEffectiveThemeColor());document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='flex';buildMenu();buildSidebarUser();applySidebarCollapsePref();nav('dashboard');}
 function doLogout(){CU=null;clearSession();applyThemeColor(computeEffectiveThemeColor());document.getElementById('login-screen').style.display='flex';document.getElementById('app').style.display='none';document.getElementById('login-user').value='';document.getElementById('login-pass').value='';document.getElementById('login-error').classList.remove('show');}
 document.getElementById('login-pass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
 document.getElementById('login-user').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('login-pass').focus()});
 
-var MENU_DEF=[{id:'dashboard',icon:'fa-gauge-high',label:'Dashboard',roles:['admin','pengawas','spv','pelaksana'],group:'Utama'},{id:'preferensi-tampilan',icon:'fa-palette',label:'Preferensi Tampilan',roles:['admin','pengawas','spv','pelaksana'],group:'Utama'},{id:'app-settings',icon:'fa-gear',label:'Pengaturan Aplikasi',roles:['admin'],group:'Utama'},{id:'pengaturan-ai',icon:'fa-robot',label:'Pengaturan AI',roles:['admin'],group:'Utama'},{id:'master-area',icon:'fa-map-location-dot',label:'Master Area',roles:['admin'],group:'Master Data'},{id:'master-checksheet',icon:'fa-clipboard-check',label:'Master Checksheet',roles:['admin'],group:'Master Data'},{id:'master-user',icon:'fa-users-gear',label:'Master User',roles:['admin'],group:'Master Data'},{id:'master-kantin',icon:'fa-utensils',label:'Master Kantin',roles:['admin'],group:'Master Data'},{id:'jadwal-piket',icon:'fa-calendar-check',label:'Jadwal Piket Kantin',roles:['admin'],group:'Jadwal'},{id:'jadwal-pengawas',icon:'fa-rotate',label:'Rolling Pengawas',roles:['admin'],group:'Jadwal'},{id:'tukar-jadwal',icon:'fa-right-left',label:'Tukar Jadwal Pengawas',roles:['admin','pengawas'],group:'Jadwal'},{id:'input-penilaian',icon:'fa-pen-to-square',label:'Penilaian 5R',roles:['admin','pengawas','spv','pelaksana'],group:'Input Penilaian'},{id:'input-inisiatif',icon:'fa-lightbulb',label:'Inisiatif',roles:['admin','pengawas','spv','pelaksana'],group:'Input Penilaian'},{id:'input-mystery',icon:'fa-user-secret',label:'Mystery Guest',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'input-piket-kantin',icon:'fa-utensils',label:'Piket Kantin',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'rekap-bulanan',icon:'fa-chart-bar',label:'Rekap Bulanan',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'},{id:'klasemen',icon:'fa-trophy',label:'Klasemen Lomba',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'}];
+var MENU_DEF=[{id:'dashboard',icon:'fa-gauge-high',label:'Dashboard',roles:['admin','pengawas','spv','pelaksana'],group:'Utama'},{id:'preferensi-tampilan',icon:'fa-palette',label:'Preferensi Tampilan',roles:['admin','pengawas','spv','pelaksana'],group:'Utama'},{id:'app-settings',icon:'fa-gear',label:'Pengaturan Aplikasi',roles:['admin'],group:'Utama'},{id:'pengaturan-ai',icon:'fa-robot',label:'Pengaturan AI',roles:['admin'],group:'Utama'},{id:'master-area',icon:'fa-map-location-dot',label:'Master Area',roles:['admin'],group:'Master Data'},{id:'master-checksheet',icon:'fa-clipboard-check',label:'Master Checksheet',roles:['admin'],group:'Master Data'},{id:'master-user',icon:'fa-users-gear',label:'Master User',roles:['admin'],group:'Master Data'},{id:'master-kantin',icon:'fa-utensils',label:'Master Kantin',roles:['admin'],group:'Master Data'},{id:'master-jam',icon:'fa-clock',label:'Master Jam Penilaian',roles:['admin'],group:'Master Data'},{id:'jadwal-piket',icon:'fa-calendar-check',label:'Jadwal Piket Kantin',roles:['admin'],group:'Jadwal'},{id:'jadwal-pengawas',icon:'fa-rotate',label:'Rolling Pengawas',roles:['admin'],group:'Jadwal'},{id:'tukar-jadwal',icon:'fa-right-left',label:'Tukar Jadwal Pengawas',roles:['admin','pengawas'],group:'Jadwal'},{id:'input-penilaian',icon:'fa-pen-to-square',label:'Penilaian 5R',roles:['admin','spv'],group:'Input Penilaian'},{id:'input-inisiatif',icon:'fa-lightbulb',label:'Inisiatif',roles:['admin','pengawas','spv','pelaksana'],group:'Input Penilaian'},{id:'input-mystery',icon:'fa-user-secret',label:'Mystery Guest',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'input-piket-kantin',icon:'fa-utensils',label:'Piket Kantin',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'rekap-bulanan',icon:'fa-chart-bar',label:'Rekap Bulanan',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'},{id:'klasemen',icon:'fa-trophy',label:'Klasemen Lomba',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'}];
 var PAGE_TITLES={};MENU_DEF.forEach(function(m){PAGE_TITLES[m.id]=m.label});
 function canAccess(pageId){var m=MENU_DEF.find(function(x){return x.id===pageId});if(!m||!CU)return false;return m.roles.indexOf(CU.role)>=0;}
 function pendingSwapCount(){if(!CU)return 0;var reqs=DB.get('swap_pengawas')||[];return reqs.filter(function(r){return r.status==='pending';}).length;}
 function menuBadgeHtml(m){if(m.id==='tukar-jadwal' && CU && CU.role==='admin'){var c=pendingSwapCount();if(c>0)return '<span class="menu-badge">'+c+'</span>';}return '';}
 function updateMenuBadges(){var el=document.querySelector('.menu-item[data-page="tukar-jadwal"]');if(!el)return;var existing=el.querySelector('.menu-badge');if(CU && CU.role==='admin'){var c=pendingSwapCount();if(c>0){if(existing)existing.textContent=c;else{el.insertAdjacentHTML('beforeend','<span class="menu-badge">'+c+'</span>');}}else if(existing){existing.remove();}}else if(existing){existing.remove();}}
-function buildMenu(){var html='';var lastGroup='';MENU_DEF.forEach(function(m){if(!canAccess(m.id))return;if(m.group!==lastGroup){lastGroup=m.group;html+='<div class="menu-group"><div class="menu-group-label">'+m.group+'</div>';}html+='<div class="menu-item" data-page="'+m.id+'"><i class="fas '+m.icon+'"></i>'+m.label+menuBadgeHtml(m)+'</div>';});html+='</div>';document.getElementById('menu-container').innerHTML=html;document.querySelectorAll('.menu-item').forEach(function(el){el.addEventListener('click',function(){var pg=el.getAttribute('data-page');if(pg)nav(pg);});});}
+function buildMenu(){var html='';var lastGroup='';MENU_DEF.forEach(function(m){if(!canAccess(m.id))return;if(m.group!==lastGroup){lastGroup=m.group;html+='<div class="menu-group"><div class="menu-group-label">'+m.group+'</div>';}html+='<div class="menu-item" data-page="'+m.id+'" title="'+m.label+'"><i class="fas '+m.icon+'"></i><span class="menu-label">'+m.label+'</span>'+menuBadgeHtml(m)+'</div>';});html+='</div>';document.getElementById('menu-container').innerHTML=html;document.querySelectorAll('.menu-item').forEach(function(el){el.addEventListener('click',function(){var pg=el.getAttribute('data-page');if(pg)nav(pg);});});}
+// Ciutkan/lebarkan sidebar (menu) supaya area tabel/foto di Penilaian 5R lebih lega.
+// Preferensi disimpan di localStorage per-browser (bukan per akun), jadi tetap kepilih
+// lagi walau halaman direfresh atau login-logout.
+function toggleSidebarCollapse(){
+  var sb=document.getElementById('sidebar');
+  var collapsed=sb.classList.toggle('collapsed');
+  try{localStorage.setItem('erp5r_sidebar_collapsed',collapsed?'1':'0');}catch(e){}
+  var ic=document.querySelector('#sidebar-toggle-btn i');
+  if(ic)ic.className=collapsed?'fas fa-angles-right':'fas fa-angles-left';
+}
+function applySidebarCollapsePref(){
+  var saved;try{saved=localStorage.getItem('erp5r_sidebar_collapsed');}catch(e){saved=null;}
+  if(saved==='1'){
+    document.getElementById('sidebar').classList.add('collapsed');
+    var ic=document.querySelector('#sidebar-toggle-btn i');
+    if(ic)ic.className='fas fa-angles-right';
+  }
+}
 function buildSidebarUser(){if(!CU){document.getElementById('sidebar-user').innerHTML='';return;}var colors={admin:'#ef4444',pengawas:'#3b82f6',spv:'#f59e0b',pelaksana:'#6366f1'};var initials=CU.name.split(' ').map(function(w){return w[0]}).join('').substring(0,2).toUpperCase();document.getElementById('sidebar-user').innerHTML='<div class="sidebar-avatar" style="background:'+colors[CU.role]+'">'+initials+'</div><div class="sidebar-userinfo"><div class="name">'+CU.name+'</div><div class="role">'+ROLES[CU.role]+'</div></div>';}
 var curPage='dashboard';
 function refreshCU(){if(!CU)return;var fresh=DB.get('users').find(function(x){return x.id===CU.id});if(fresh){CU=fresh;setSession(fresh);}}
-function nav(pg){refreshCU();if(!canAccess(pg)){document.getElementById('content').innerHTML='<div class="no-access"><i class="fas fa-lock"></i><p>Anda tidak memiliki akses.</p></div>';return;}curPage=pg;document.querySelectorAll('.menu-item').forEach(function(m){m.classList.toggle('active',m.getAttribute('data-page')===pg)});document.getElementById('page-title').textContent=PAGE_TITLES[pg]||'';var fn={dashboard:pgDashboard,'preferensi-tampilan':pgPreferensiTampilan,'app-settings':pgAppSettings,'pengaturan-ai':pgPengaturanAI,'master-area':pgMasterArea,'master-checksheet':pgMasterCheck,'master-user':pgMasterUser,'master-kantin':pgMasterKantin,'jadwal-piket':pgJadwalPiket,'jadwal-pengawas':pgJadwalPw,'tukar-jadwal':pgTukarJadwal,'input-penilaian':pgInputPen,'input-inisiatif':pgInputIni,'input-mystery':pgInputMys,'input-piket-kantin':pgInputPK,'rekap-bulanan':pgRekap,klasemen:pgKlasemen};if(fn[pg])fn[pg]();else document.getElementById('content').innerHTML='<div class="empty-state"><p>Halaman belum tersedia.</p></div>';document.getElementById('sidebar').classList.remove('open');}
+function nav(pg){refreshCU();if(!canAccess(pg)){document.getElementById('content').innerHTML='<div class="no-access"><i class="fas fa-lock"></i><p>Anda tidak memiliki akses.</p></div>';return;}curPage=pg;document.querySelectorAll('.menu-item').forEach(function(m){m.classList.toggle('active',m.getAttribute('data-page')===pg)});document.getElementById('page-title').textContent=PAGE_TITLES[pg]||'';var fn={dashboard:pgDashboard,'preferensi-tampilan':pgPreferensiTampilan,'app-settings':pgAppSettings,'pengaturan-ai':pgPengaturanAI,'master-area':pgMasterArea,'master-checksheet':pgMasterCheck,'master-user':pgMasterUser,'master-kantin':pgMasterKantin,'master-jam':pgMasterJam,'jadwal-piket':pgJadwalPiket,'jadwal-pengawas':pgJadwalPw,'tukar-jadwal':pgTukarJadwal,'input-penilaian':pgInputPen,'input-inisiatif':pgInputIni,'input-mystery':pgInputMys,'input-piket-kantin':pgInputPK,'rekap-bulanan':pgRekap,klasemen:pgKlasemen};if(fn[pg])fn[pg]();else document.getElementById('content').innerHTML='<div class="empty-state"><p>Halaman belum tersedia.</p></div>';document.getElementById('sidebar').classList.remove('open');}
 var _charts={};function mkChart(id,cfg){if(_charts[id]){_charts[id].destroy();delete _charts[id];}var el=document.getElementById(id);if(!el)return;_charts[id]=new Chart(el,cfg);}
 
-function calcScore(areaId,y,m){var area=DB.get('areas').find(function(a){return a.id===areaId});if(!area)return null;var cls=DB.get('checklists').filter(function(c){return c.areaId===areaId});var n=cls.length;if(n===0)return{base:0,initB:0,mysP:0,kantB:0,kantP:0,final:0,area:area};var ppi=100/n;var pen=getAllPenilaian().filter(function(p){return p.areaId===areaId&&p.date.substring(0,7)===mPrefix(y,m)});var dates=allDates(y,m);var daily=[];dates.forEach(function(date){var shifts=[];['pagi','siang'].forEach(function(shift){var rec=pen.find(function(p){return p.date===date&&p.shift===shift});if(rec&&rec.items){var t=0;cls.forEach(function(cl){var it=rec.items.find(function(i){return i.clId===cl.id});if(it&&it.picAi&&it.picAi.result==='ok'&&it.spvAi&&it.spvAi.result==='ok'&&it.pwStatus==='ok')t+=ppi;});shifts.push(t);}});if(shifts.length>0)daily.push(shifts.reduce(function(a,b){return a+b},0)/shifts.length);});var base=daily.length>0?daily.reduce(function(a,b){return a+b},0)/daily.length:0;var pf=mPrefix(y,m);var initB=DB.get('inisiatif').filter(function(i){return i.areaId===areaId&&i.date.substring(0,7)===pf}).length*25;var mysP=DB.get('mystery').filter(function(x){return x.areaId===areaId&&x.date.substring(0,7)===pf}).length*25;var ks=getKantinSettings();var kantB=0,kantP=0;DB.get('pk_result').forEach(function(r){if(r.date.substring(0,7)!==pf)return;var okVerif=ks.wajibVerifikasi?!!r.verified:true;if(!okVerif)return;var duty=getDuty(r.date,r.shift);if(duty!==areaId)return;if(r.clean)kantB+=ks.bonus;else kantP+=ks.penalty;});var fin=base+initB-mysP+kantB-kantP;if(area.type==='non-lomba'&&fin>100)fin=100;return{base:Math.round(base*100)/100,initB:initB,mysP:mysP,kantB:kantB,kantP:kantP,final:Math.round(fin*100)/100,area:area};}
+function calcScore(areaId,y,m){var area=DB.get('areas').find(function(a){return a.id===areaId});if(!area)return null;var cls=DB.get('checklists').filter(function(c){return c.areaId===areaId});var n=cls.length;if(n===0)return{base:0,initB:0,mysP:0,kantB:0,kantP:0,final:0,area:area};var ppi=100/n;var jam=getJamSettings();var now=new Date();var pen=getAllPenilaian().filter(function(p){return p.areaId===areaId&&p.date.substring(0,7)===mPrefix(y,m)});var dates=allDates(y,m);var daily=[];dates.forEach(function(date){if(!isActiveDay(date,jam))return;var shifts=[];['pagi','siang'].forEach(function(shift){var dl=pen_deadlines(date,shift,jam);if(now<dl.upload)return;var rec=pen.find(function(p){return p.date===date&&p.shift===shift});var t=0;cls.forEach(function(cl){var it=rec?rec.items.find(function(i){return i.clId===cl.id}):null;if(!it)it={clId:cl.id,photo:null,ai:null,photoPerbaikan:null,aiPerbaikan:null};var st=pen_computeStatus(it,date,shift,jam,now);if(st.poin==='full')t+=ppi;else if(st.poin==='minus')t-=ppi;});shifts.push(t);});if(shifts.length>0)daily.push(shifts.reduce(function(a,b){return a+b},0)/shifts.length);});var base=daily.length>0?daily.reduce(function(a,b){return a+b},0)/daily.length:0;var pf=mPrefix(y,m);var initB=DB.get('inisiatif').filter(function(i){return i.areaId===areaId&&i.date.substring(0,7)===pf}).length*25;var mysP=DB.get('mystery').filter(function(x){return x.areaId===areaId&&x.date.substring(0,7)===pf}).length*25;var ks=getKantinSettings();var kantB=0,kantP=0;DB.get('pk_result').forEach(function(r){if(r.date.substring(0,7)!==pf)return;var okVerif=ks.wajibVerifikasi?!!r.verified:true;if(!okVerif)return;var duty=getDuty(r.date,r.shift);if(duty!==areaId)return;if(r.clean)kantB+=ks.bonus;else kantP+=ks.penalty;});var fin=base+initB-mysP+kantB-kantP;if(area.type==='non-lomba'&&fin>100)fin=100;return{base:Math.round(base*100)/100,initB:initB,mysP:mysP,kantB:kantB,kantP:kantP,final:Math.round(fin*100)/100,area:area};}
 function getDuty(date,shift){var s=DB.get('piket_kantin').find(function(p){return p.date===date&&p.shift===shift});return s?s.areaId:null;}
 function getPwForDate(dateStr){var ws=weekStart(dateStr);var s=DB.get('pw_schedule').find(function(x){return x.weekStart===ws});if(!s)return null;return DB.get('users').find(function(u){return u.id===s.pwId&&u.role==='pengawas'})||null;}
 
@@ -495,7 +524,7 @@ function getAiSettings(){var s=DB.get('ai_settings');if(!s||Array.isArray(s))s={
 function pgPengaturanAI(){
   var s=getAiSettings();
   var h='<div class="card"><div class="card-title" style="margin-bottom:6px"><i class="fas fa-robot"></i> Pengaturan Koneksi AI (Gemini)</div>';
-  h+='<div class="info-box" style="margin-bottom:14px"><i class="fas fa-circle-info"></i> AI dipakai untuk menilai foto Pelaksana &amp; SPV secara otomatis di menu Penilaian 5R, dengan cara membandingkan ke Foto Referensi yang di-set di Master Checksheet. Koneksinya lewat Supabase Edge Function <code>assess-photo</code> yang memanggil Google Gemini. Kalau Google mempensiunkan sebuah model (kadang terjadi), Anda tidak perlu edit kode lagi &mdash; cukup ganti nama model di bawah ini.</div>';
+  h+='<div class="info-box" style="margin-bottom:14px"><i class="fas fa-circle-info"></i> AI dipakai untuk menilai foto SPV (foto awal &amp; foto perbaikan) secara otomatis di menu Penilaian 5R, dengan cara membandingkan ke Foto Referensi yang di-set di Master Checksheet. Koneksinya lewat Supabase Edge Function <code>assess-photo</code> yang memanggil Google Gemini. Kalau Google mempensiunkan sebuah model (kadang terjadi), Anda tidak perlu edit kode lagi &mdash; cukup ganti nama model di bawah ini.</div>';
   h+='<div class="form-group"><label class="form-label">Nama Model Gemini</label><input class="form-input" id="ai-model" value="'+s.model+'" placeholder="contoh: gemini-3.6-flash"></div>';
   h+='<div style="font-size:11px;color:var(--text-muted);margin:-6px 0 12px">Kalau muncul error "model ... no longer available", ganti nama model di sini sesuai yang disebut di pesan errornya, lalu Simpan.</div>';
   h+='<button class="btn btn-primary" onclick="saveAiSettings()"><i class="fas fa-save"></i> Simpan</button> ';
@@ -628,10 +657,90 @@ function applyBranding(){
 function pgDashboard(){var now=new Date(),y=now.getFullYear(),m=now.getMonth();var areas=DB.get('areas');var lomba=areas.filter(function(a){return a.type==='lomba'});var nonL=areas.filter(function(a){return a.type==='non-lomba'});var td=todayStr();var todayPen=getAllPenilaian().filter(function(p){return p.date===td});var doneShifts={};todayPen.forEach(function(p){doneShifts[p.areaId+'_'+p.shift]=1;});var pct=areas.length>0?Math.round(Object.keys(doneShifts).length/(areas.length*2)*100):0;var scores=[];areas.forEach(function(a){var s=calcScore(a.id,y,m);if(s)scores.push(s);});scores.sort(function(a,b){return b.final-a.final});var top=scores[0];var acts=DB.get('activities').slice(-6).reverse();var h='';if(areas.length===0&&CU.role==='admin'){h+='<div class="seed-banner"><p><i class="fas fa-database" style="margin-right:5px"></i>Kosong. Muat data contoh.</p><button class="btn" style="background:rgba(255,255,255,.2);color:#fff;border:1px solid rgba(255,255,255,.3)" onclick="seedFromLogin()"><i class="fas fa-flask"></i>Muat Data Contoh</button></div>';}h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:10px;margin-bottom:14px">';h+='<div class="stat-card"><div class="stat-icon" style="background:#dbeafe;color:#1d4ed8"><i class="fas fa-map-location-dot"></i></div><div><div class="stat-value">'+areas.length+'</div><div class="stat-label">Total Area</div></div></div>';h+='<div class="stat-card"><div class="stat-icon" style="background:#e0f2fe;color:#075985"><i class="fas fa-trophy"></i></div><div><div class="stat-value">'+lomba.length+'</div><div class="stat-label">Area Lomba</div></div></div>';h+='<div class="stat-card"><div class="stat-icon" style="background:#fef3c7;color:#92400e"><i class="fas fa-building"></i></div><div><div class="stat-value">'+nonL.length+'</div><div class="stat-label">Non-Lomba</div></div></div>';h+='<div class="stat-card"><div class="stat-icon" style="background:#ede9fe;color:#6d28d9"><i class="fas fa-chart-pie"></i></div><div><div class="stat-value">'+pct+'%</div><div class="stat-label">Hari Ini</div></div></div></div>';h+='<div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px"><div class="card"><div class="card-header"><div class="card-title">Skor Bulan Ini</div></div><canvas id="ch-d1" height="170"></canvas></div><div class="card"><div class="card-header"><div class="card-title">Komposisi</div></div><canvas id="ch-d2" height="170"></canvas></div></div>';h+='<div style="display:grid;grid-template-columns:1fr 1fr;gap:12px"><div class="card"><div class="card-header"><div class="card-title">Top Performer</div></div>';if(top){h+='<div style="text-align:center;padding:6px 0"><div style="width:48px;height:48px;border-radius:50%;background:linear-gradient(135deg,#f59e0b,#fbbf24);display:inline-flex;align-items:center;justify-content:center;color:#fff;font-size:20px;margin-bottom:4px"><i class="fas fa-crown"></i></div><div style="font-weight:700;font-size:14px">'+top.area.name+'</div><div style="font-size:10px;color:var(--text-muted)">'+(top.area.type==='lomba'?'Lomba':'Non-Lomba')+'</div><div style="font-size:26px;font-weight:900;color:var(--primary)">'+top.final+'</div></div>';}else{h+='<div class="empty-state"><i class="fas fa-chart-line"></i><p>Belum ada data</p></div>';}h+='</div><div class="card"><div class="card-header"><div class="card-title">Aktivitas Terbaru</div></div>';if(acts.length>0){acts.forEach(function(a){h+='<div style="display:flex;align-items:start;gap:7px;padding:4px 0;border-bottom:1px solid #f1f5f9"><div style="width:5px;height:5px;border-radius:50%;background:var(--primary);margin-top:5px;flex-shrink:0"></div><div><div style="font-size:11px">'+a.desc+'</div><div style="font-size:9px;color:var(--text-muted)">'+fmtD(a.date)+'</div></div></div>';});}else{h+='<div class="empty-state"><i class="fas fa-clock-rotate-left"></i><p>Belum ada aktivitas</p></div>';}h+='</div></div>';var _patterns=detectPatterns().slice(0,5);if(_patterns.length>0){h+='<div class="card" style="margin-top:12px"><div class="card-header"><div class="card-title"><i class="fas fa-triangle-exclamation" style="color:var(--danger)"></i> Pola Bermasalah (Kronis)</div></div>';_patterns.forEach(function(p){h+='<div style="display:flex;justify-content:space-between;align-items:center;padding:6px 0;border-bottom:1px solid #f1f5f9"><div><div style="font-weight:600;font-size:12px">'+p.area.name+'</div><div style="font-size:11px;color:var(--text-muted)">'+p.cl.desc+'</div></div><span class="badge badge-tidak">'+p.count+'x NOK</span></div>';});h+='</div>';}document.getElementById('content').innerHTML=h;if(scores.length>0){mkChart('ch-d1',{type:'bar',data:{labels:scores.map(function(s){return s.area.name}),datasets:[{label:'Dasar',data:scores.map(function(s){return s.base}),backgroundColor:'rgba(148,163,184,0.35)',borderRadius:3},{label:'Akhir',data:scores.map(function(s){return s.final}),backgroundColor:scores.map(function(s){return s.area.type==='lomba'?'rgba(37,99,235,0.75)':'rgba(245,158,11,0.7)'}),borderRadius:3}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},scales:{y:{beginAtZero:true}}}});mkChart('ch-d2',{type:'doughnut',data:{labels:['Lomba','Non-Lomba'],datasets:[{data:[lomba.length,nonL.length],backgroundColor:['#2563eb','#f59e0b'],borderWidth:0}]},options:{responsive:true,plugins:{legend:{position:'bottom',labels:{font:{size:10}}}},cutout:'60%'}});}}
 
 function getKantinSettings(){var s=DB.get('kantin_settings');if(!s||Array.isArray(s))s={};return{bonus:(typeof s.bonus==='number'?s.bonus:100),penalty:(typeof s.penalty==='number'?s.penalty:50),wajibVerifikasi:(s.wajibVerifikasi!==false),shiftPagi:(s.shiftPagi||'07:00 - 15:00'),shiftSore:(s.shiftSore||'15:00 - 22:00')};}
+
+// ==== MASTER JAM PENILAIAN 5R (jadwal upload & perbaikan, berlaku global utk semua area) ====
+function getJamSettings(){var s=DB.get('jam_settings');if(!s||Array.isArray(s))s={};return{uploadPagi:(s.uploadPagi||'08:00'),perbaikanPagi:(s.perbaikanPagi||'10:00'),uploadSore:(s.uploadSore||'15:00'),perbaikanSore:(s.perbaikanSore||'17:00'),activeDays:(Array.isArray(s.activeDays)?s.activeDays:[1,2,3,4,5])};}
+// Cek apakah tanggal (YYYY-MM-DD) jatuh di salah satu "Hari Aktif" Master Jam Penilaian.
+// Dipakai bareng untuk Penilaian 5R DAN Rolling Piket Kantin, supaya konsisten satu pengaturan.
+// getDay(): 0=Minggu, 1=Senin, ... 6=Sabtu
+function isActiveDay(dateStr,jam){jam=jam||getJamSettings();var d=new Date(dateStr+'T00:00:00').getDay();return jam.activeDays.indexOf(d)!==-1;}
+var HARI_LABEL=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+function pgMasterJam(){
+  var s=getJamSettings();
+  var h='<div class="card"><div class="card-title" style="margin-bottom:6px"><i class="fas fa-clock"></i> Master Jam Penilaian 5R</div>';
+  h+='<div class="info-box" style="margin-bottom:14px"><i class="fas fa-circle-info"></i> Jadwal ini berlaku untuk <strong>semua area</strong>. SPV wajib upload foto sebelum <strong>Batas Upload</strong>; kalau hasil AI Tidak OK atau belum sempat upload, masih ada kesempatan mengunggah <strong>Foto Perbaikan</strong> sampai <strong>Batas Perbaikan</strong>. Setelah Batas Perbaikan lewat, nilai item dikunci otomatis oleh sistem (tidak perlu approval manual).</div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px">';
+  h+='<div class="form-group"><label class="form-label"><i class="fas fa-sun"></i> Batas Upload Pagi</label><input type="time" class="form-input" id="jm-up-pagi" value="'+s.uploadPagi+'"></div>';
+  h+='<div class="form-group"><label class="form-label"><i class="fas fa-wrench"></i> Batas Perbaikan Pagi</label><input type="time" class="form-input" id="jm-pb-pagi" value="'+s.perbaikanPagi+'"></div>';
+  h+='<div class="form-group"><label class="form-label"><i class="fas fa-cloud-sun"></i> Batas Upload Sore</label><input type="time" class="form-input" id="jm-up-sore" value="'+s.uploadSore+'"></div>';
+  h+='<div class="form-group"><label class="form-label"><i class="fas fa-wrench"></i> Batas Perbaikan Sore</label><input type="time" class="form-input" id="jm-pb-sore" value="'+s.perbaikanSore+'"></div>';
+  h+='</div>';
+  h+='<div class="info-box info-warn" style="margin-top:8px"><i class="fas fa-triangle-exclamation"></i> Aturan poin: Foto awal OK = poin penuh. Tidak OK / tidak upload = minus per poin (sementara), lalu terbuka kesempatan Foto Perbaikan. Perbaikan jadi OK sebelum Batas Perbaikan = poin netral (0). Kalau sampai Batas Perbaikan masih Tidak OK / tidak diperbaiki = poin tetap minus.</div>';
+  h+='<div class="form-group" style="margin-top:14px"><label class="form-label">Hari Aktif (Penilaian 5R &amp; Rolling Piket Kantin)</label>';
+  h+='<div style="display:flex;gap:10px;flex-wrap:wrap">'+HARI_LABEL.map(function(lbl,idx){var checked=s.activeDays.indexOf(idx)!==-1;return'<label style="display:flex;align-items:center;gap:5px;font-size:12px;font-weight:600;cursor:pointer;background:#f8fafc;border:1px solid var(--border);border-radius:8px;padding:6px 10px"><input type="checkbox" class="jm-day-chk" value="'+idx+'" '+(checked?'checked':'')+' style="width:14px;height:14px">'+lbl+'</label>';}).join('')+'</div></div>';
+  h+='<div style="font-size:11px;color:var(--text-muted);margin:-4px 0 10px">Hari yang TIDAK dicentang dianggap libur: tidak ada Penilaian 5R (tidak dihitung ke skor sama sekali, bukan dianggap nol), dan tidak akan di-generate jadwal Rolling Piket Kantin.</div>';
+  h+='<button class="btn btn-primary" style="margin-top:8px" onclick="saveJamSettings()"><i class="fas fa-save"></i> Simpan Jadwal</button>';
+  h+='</div>';
+  document.getElementById('content').innerHTML=h;
+}
+function saveJamSettings(){
+  var up1=document.getElementById('jm-up-pagi').value||'08:00';
+  var pb1=document.getElementById('jm-pb-pagi').value||'10:00';
+  var up2=document.getElementById('jm-up-sore').value||'15:00';
+  var pb2=document.getElementById('jm-pb-sore').value||'17:00';
+  if(pb1<=up1){toast('Batas Perbaikan Pagi harus lebih besar dari Batas Upload Pagi','error');return;}
+  if(pb2<=up2){toast('Batas Perbaikan Sore harus lebih besar dari Batas Upload Sore','error');return;}
+  var activeDays=[];document.querySelectorAll('.jm-day-chk:checked').forEach(function(el){activeDays.push(parseInt(el.value));});
+  if(activeDays.length===0){toast('Pilih minimal 1 hari aktif','error');return;}
+  var s={uploadPagi:up1,perbaikanPagi:pb1,uploadSore:up2,perbaikanSore:pb2,activeDays:activeDays};
+  DB.set('jam_settings',s,function(ok){if(ok){toast('Jadwal jam penilaian disimpan');logAct('Update Master Jam Penilaian 5R ('+up1+'/'+pb1+' - '+up2+'/'+pb2+', hari aktif: '+activeDays.map(function(d){return HARI_LABEL[d];}).join(', ')+')');}});
+}
+// Batas waktu (Date object) utk shift tertentu pada tanggal tertentu, berdasar Master Jam.
+function pen_deadlines(dateStr,shift,jam){
+  var upTime=shift==='pagi'?jam.uploadPagi:jam.uploadSore;
+  var pbTime=shift==='pagi'?jam.perbaikanPagi:jam.perbaikanSore;
+  return{upload:new Date(dateStr+'T'+upTime+':00'),perbaikan:new Date(dateStr+'T'+pbTime+':00')};
+}
+// Status & poin final/interim satu item penilaian, dihitung otomatis dari waktu sekarang
+// dibanding Master Jam -- TIDAK butuh approval manual siapa pun.
+// poin: 'full' (poin penuh), 'netral' (0, sudah diperbaiki), 'minus' (dikurangi penuh), 'pending' (belum jatuh tempo/masih diproses, tidak dihitung)
+// phase: 'upload' (masih jendela upload awal), 'perbaikan' (jendela perbaikan sedang berjalan), 'selesai' (sudah final/terkunci)
+function pen_computeStatus(it,dateStr,shift,jam,now){
+  now=now||new Date();
+  it=it||{};
+  var dl=pen_deadlines(dateStr,shift,jam);
+  var aiOk=it.ai&&!it.ai.failed&&it.ai.result==='ok';
+  var aiNok=it.ai&&!it.ai.failed&&it.ai.result==='nok';
+  var aiFailed=it.ai&&it.ai.failed;
+  var aiPending=it.photo&&!it.ai;
+  var pbOk=it.aiPerbaikan&&!it.aiPerbaikan.failed&&it.aiPerbaikan.result==='ok';
+  var pbNok=it.aiPerbaikan&&!it.aiPerbaikan.failed&&it.aiPerbaikan.result==='nok';
+  var pbFailed=it.aiPerbaikan&&it.aiPerbaikan.failed;
+  var pbPending=it.photoPerbaikan&&!it.aiPerbaikan;
+
+  if(aiOk) return{code:'ok',label:'OK',poin:'full',phase:'selesai'};
+  if(pbOk) return{code:'diperbaiki',label:'Diperbaiki (OK)',poin:'netral',phase:'selesai'};
+
+  if(now<dl.upload){
+    if(aiPending) return{code:'menilai',label:'Sedang dinilai AI...',poin:'pending',phase:'upload'};
+    if(aiFailed) return{code:'gagal',label:'AI gagal menilai, coba lagi',poin:'pending',phase:'upload'};
+    if(aiNok) return{code:'nok_awal',label:'Tidak OK - tunggu jam perbaikan dibuka',poin:'minus',phase:'upload'};
+    return{code:'menunggu',label:'Menunggu upload (batas '+(shift==='pagi'?jam.uploadPagi:jam.uploadSore)+')',poin:'pending',phase:'upload'};
+  }
+  if(now<dl.perbaikan){
+    if(pbPending) return{code:'menilai_pb',label:'Foto perbaikan sedang dinilai AI...',poin:'minus',phase:'perbaikan'};
+    if(pbFailed) return{code:'gagal_pb',label:'AI gagal menilai foto perbaikan, coba lagi',poin:'minus',phase:'perbaikan'};
+    if(pbNok) return{code:'nok_pb',label:'Foto perbaikan masih Tidak OK',poin:'minus',phase:'perbaikan'};
+    if(!it.photo) return{code:'terlambat',label:'Laporan awal terlambat - upload foto perbaikan sebelum '+(shift==='pagi'?jam.perbaikanPagi:jam.perbaikanSore),poin:'minus',phase:'perbaikan'};
+    return{code:'nok_awal',label:'Tidak OK - segera upload foto perbaikan',poin:'minus',phase:'perbaikan'};
+  }
+  if(!it.photo&&!it.photoPerbaikan) return{code:'terlambat_final',label:'Tidak lapor sama sekali (final)',poin:'minus',phase:'selesai'};
+  return{code:'nok_final',label:'Tidak OK (final)',poin:'minus',phase:'selesai'};
+}
 function pgMasterKantin(){
   var s=getKantinSettings();
   var h='<div class="card"><div class="card-title" style="margin-bottom:6px"><i class="fas fa-utensils"></i> Ketentuan Piket &amp; Penilaian Kantin</div>';
-  h+='<div class="info-box" style="margin-bottom:14px"><i class="fas fa-circle-info"></i> Alur: Jadwal Piket Kantin (rolling per Area) di-generate di menu <strong>Jadwal Piket Kantin</strong> &rarr; PIC/Pengawas mengisi kondisi kantin (Bersih/Kotor) tiap shift di menu <strong>Piket Kantin</strong> &rarr; hasil harus <strong>diverifikasi</strong> Admin/Pengawas &rarr; setelah diverifikasi, otomatis menambah/mengurangi Skor Akhir 5R Area yang bertugas piket saat itu. Ini terpisah dari Penilaian 5R harian yang diisi PIC Pelaksana.</div>';
+  h+='<div class="info-box" style="margin-bottom:14px"><i class="fas fa-circle-info"></i> Alur: Jadwal Piket Kantin (rolling per Area) di-generate di menu <strong>Jadwal Piket Kantin</strong> &rarr; PIC/Pengawas mengisi kondisi kantin (Bersih/Kotor) tiap shift di menu <strong>Piket Kantin</strong> &rarr; hasil harus <strong>diverifikasi</strong> Admin/Pengawas &rarr; setelah diverifikasi, otomatis menambah/mengurangi Skor Akhir 5R Area yang bertugas piket saat itu. Ini terpisah dari Penilaian 5R harian yang diisi SPV (lihat menu Master Jam Penilaian).</div>';
   h+='<div class="form-group"><label class="form-label">Poin Bonus jika Kantin Bersih (per shift terverifikasi)</label><input type="number" class="form-input" id="ks-bonus" value="'+s.bonus+'"></div>';
   h+='<div class="form-group"><label class="form-label">Poin Penalti jika Kantin Kotor (per shift terverifikasi, dibebankan ke Area piket)</label><input type="number" class="form-input" id="ks-penalty" value="'+s.penalty+'"></div>';
   h+='<div class="form-group"><label class="form-label">Jam Shift Pagi</label><input class="form-input" id="ks-pagi" value="'+s.shiftPagi+'"></div>';
@@ -766,16 +875,26 @@ function saveUser(id){
 function delUser(id){var u=DB.get('users').find(function(x){return x.id===id});showModal('Hapus User','<p>Hapus <strong>'+(u?u.name:'')+'</strong>?</p>','<button class="btn btn-outline" onclick="hideModal()">Batal</button><button class="btn btn-danger" onclick="DB.set(\'users\',DB.get(\'users\').filter(function(x){return x.id!==\''+id+'\'}));hideModal();toast(\'Dihapus\');pgMasterUser()">Hapus</button>');}
 
 var _pkY,_pkM;
-function pgJadwalPiket(){var now=new Date();if(_pkY===undefined){_pkY=now.getFullYear();_pkM=now.getMonth();}var areas=DB.get('areas');var sched=DB.get('piket_kantin');var n=daysInMonth(_pkY,_pkM);var ao=areas.map(function(a){return'<option value="'+a.id+'">'+a.name+'</option>'}).join('');var h='<div class="card"><div class="card-header"><div class="card-title">Jadwal Piket Kantin - '+BULAN[_pkM]+' '+_pkY+'</div><div style="display:flex;gap:5px;align-items:center"><button class="btn btn-outline btn-sm" onclick="_pkM=(_pkM+11)%12;_pkY=_pkM===11?_pkY-1:_pkY;pgJadwalPiket()"><i class="fas fa-chevron-left"></i></button><span style="font-weight:600;font-size:11px;min-width:110px;text-align:center">'+BULAN[_pkM]+' '+_pkY+'</span><button class="btn btn-outline btn-sm" onclick="_pkM=(_pkM+1)%12;_pkY=_pkM===0?_pkY+1:_pkY;pgJadwalPiket()"><i class="fas fa-chevron-right"></i></button></div></div>';
-  if(areas.length>0){h+='<div class="info-box info-warn"><i class="fas fa-shuffle"></i>Generate otomatis: Area untuk Pagi & Sore diacak masing-masing secara independen tiap hari (bisa beda area di hari yang sama).</div>';h+='<button class="btn btn-primary" onclick="genRollingPiket()" style="margin-bottom:12px"><i class="fas fa-shuffle"></i> Generate Rolling Piket (Acak)</button>';}
-  if(areas.length>0){h+='<div style="margin-bottom:10px;display:flex;gap:7px;flex-wrap:wrap;align-items:end"><div class="form-group" style="margin:0"><label class="form-label">Area</label><select class="form-select" id="bp-a" style="min-width:150px"><option value="">--</option>'+ao+'</select></div><div class="form-group" style="margin:0"><label class="form-label">Shift</label><select class="form-select" id="bp-s" style="min-width:80px"><option value="pagi">Pagi</option><option value="sore">Sore</option><option value="both">Keduanya</option></select></div><div class="form-group" style="margin:0"><label class="form-label">Dari</label><input type="number" class="form-input" id="bp-ds" min="1" max="'+n+'" value="1" style="width:58px"></div><div class="form-group" style="margin:0"><label class="form-label">Sampai</label><input type="number" class="form-input" id="bp-de" min="1" max="'+n+'" value="'+n+'" style="width:58px"></div><button class="btn btn-primary btn-sm" onclick="bulkPK()"><i class="fas fa-bolt"></i>Assign Manual</button></div>';}h+='<div style="max-height:420px;overflow-y:auto"><table><thead><tr><th style="width:40px;text-align:center">Tgl</th><th>Pagi</th><th>Sore</th></tr></thead><tbody>';for(var d=1;d<=n;d++){var ds=_pkY+'-'+String(_pkM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');var p=sched.find(function(s){return s.date===ds&&s.shift==='pagi'});var sr=sched.find(function(x){return x.date===ds&&x.shift==='sore'});h+='<tr><td style="font-weight:600;text-align:center">'+d+'</td><td><select class="form-select" style="padding:3px 6px;font-size:10px" onchange="savePKEv(\''+ds+'\',\'pagi\',this.value)"><option value="">--</option>'+areas.map(function(a){return'<option value="'+a.id+'"'+(p&&p.areaId===a.id?' selected':'')+'>'+a.name+'</option>'}).join('')+'</select></td><td><select class="form-select" style="padding:3px 6px;font-size:10px" onchange="savePKEv(\''+ds+'\',\'sore\',this.value)"><option value="">--</option>'+areas.map(function(a){return'<option value="'+a.id+'"'+(sr&&sr.areaId===a.id?' selected':'')+'>'+a.name+'</option>'}).join('')+'</select></td></tr>';}h+='</tbody></table></div></div>';document.getElementById('content').innerHTML=h;}
+function pgJadwalPiket(){var now=new Date();if(_pkY===undefined){_pkY=now.getFullYear();_pkM=now.getMonth();}var areas=DB.get('areas');var sched=DB.get('piket_kantin');var jam=getJamSettings();var n=daysInMonth(_pkY,_pkM);var ao=areas.map(function(a){return'<option value="'+a.id+'">'+a.name+'</option>'}).join('');var h='<div class="card"><div class="card-header"><div class="card-title">Jadwal Piket Kantin - '+BULAN[_pkM]+' '+_pkY+'</div><div style="display:flex;gap:5px;align-items:center"><button class="btn btn-outline btn-sm" onclick="_pkM=(_pkM+11)%12;_pkY=_pkM===11?_pkY-1:_pkY;pgJadwalPiket()"><i class="fas fa-chevron-left"></i></button><span style="font-weight:600;font-size:11px;min-width:110px;text-align:center">'+BULAN[_pkM]+' '+_pkY+'</span><button class="btn btn-outline btn-sm" onclick="_pkM=(_pkM+1)%12;_pkY=_pkM===0?_pkY+1:_pkY;pgJadwalPiket()"><i class="fas fa-chevron-right"></i></button></div></div>';
+  h+='<div class="info-box info-ok"><i class="fas fa-circle-info"></i>Hari Aktif: <strong>'+jam.activeDays.slice().sort().map(function(d){return HARI_LABEL[d];}).join(', ')+'</strong> (diatur di Master Jam Penilaian). Hari lain otomatis dilewati/libur, tidak ada rolling piket.'+(CU.role==='admin'?' <a href="#" onclick="nav(\'master-jam\');return false" style="color:inherit;text-decoration:underline">Ubah</a>.':'')+'</div>';
+  if(areas.length>0){h+='<div class="info-box info-warn"><i class="fas fa-shuffle"></i>Generate otomatis: Area untuk Pagi & Sore diacak masing-masing secara independen tiap hari (bisa beda area di hari yang sama). Hari libur dilewati otomatis.</div>';h+='<button class="btn btn-primary" onclick="genRollingPiket()" style="margin-bottom:12px"><i class="fas fa-shuffle"></i> Generate Rolling Piket (Acak)</button>';}
+  if(areas.length>0){h+='<div style="margin-bottom:10px;display:flex;gap:7px;flex-wrap:wrap;align-items:end"><div class="form-group" style="margin:0"><label class="form-label">Area</label><select class="form-select" id="bp-a" style="min-width:150px"><option value="">--</option>'+ao+'</select></div><div class="form-group" style="margin:0"><label class="form-label">Shift</label><select class="form-select" id="bp-s" style="min-width:80px"><option value="pagi">Pagi</option><option value="sore">Sore</option><option value="both">Keduanya</option></select></div><div class="form-group" style="margin:0"><label class="form-label">Dari</label><input type="number" class="form-input" id="bp-ds" min="1" max="'+n+'" value="1" style="width:58px"></div><div class="form-group" style="margin:0"><label class="form-label">Sampai</label><input type="number" class="form-input" id="bp-de" min="1" max="'+n+'" value="'+n+'" style="width:58px"></div><button class="btn btn-primary btn-sm" onclick="bulkPK()"><i class="fas fa-bolt"></i>Assign Manual</button></div>';}h+='<div style="max-height:420px;overflow-y:auto"><table><thead><tr><th style="width:40px;text-align:center">Tgl</th><th>Pagi</th><th>Sore</th></tr></thead><tbody>';for(var d=1;d<=n;d++){var ds=_pkY+'-'+String(_pkM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');var dayOff=!isActiveDay(ds,jam);var p=sched.find(function(s){return s.date===ds&&s.shift==='pagi'});var sr=sched.find(function(x){return x.date===ds&&x.shift==='sore'});if(dayOff){h+='<tr style="background:#f8fafc;color:var(--text-muted)"><td style="font-weight:600;text-align:center">'+d+'</td><td colspan="2" style="text-align:center;font-size:11px"><i class="fas fa-mug-hot"></i> Libur ('+HARI_LABEL[new Date(ds+'T00:00:00').getDay()]+') - tidak ada piket</td></tr>';continue;}h+='<tr><td style="font-weight:600;text-align:center">'+d+'</td><td><select class="form-select" style="padding:3px 6px;font-size:10px" onchange="savePKEv(\''+ds+'\',\'pagi\',this.value)"><option value="">--</option>'+areas.map(function(a){return'<option value="'+a.id+'"'+(p&&p.areaId===a.id?' selected':'')+'>'+a.name+'</option>';}).join('')+'</select></td><td><select class="form-select" style="padding:3px 6px;font-size:10px" onchange="savePKEv(\''+ds+'\',\'sore\',this.value)"><option value="">--</option>'+areas.map(function(a){return'<option value="'+a.id+'"'+(sr&&sr.areaId===a.id?' selected':'')+'>'+a.name+'</option>';}).join('')+'</select></td></tr>';}h+='</tbody></table></div></div>';document.getElementById('content').innerHTML=h;}
 function genRollingPiket(){
   var areas=DB.get('areas');
   if(areas.length===0){toast('Belum ada Area','error');return;}
+  var jam=getJamSettings();
   var n=daysInMonth(_pkY,_pkM);
   var list=DB.get('piket_kantin');
+  var skipped=0;
   for(var d=1;d<=n;d++){
     var ds=_pkY+'-'+String(_pkM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');
+    // Hari yang tidak termasuk Hari Aktif (Master Jam Penilaian) dilewati -- tidak ada
+    // piket/rolling sama sekali, dan jadwal lama di tanggal itu (kalau ada) ikut dibersihkan.
+    if(!isActiveDay(ds,jam)){
+      list=list.filter(function(x){return!(x.date===ds&&(x.shift==='pagi'||x.shift==='sore'))});
+      skipped++;
+      continue;
+    }
     var aPagi=areas[Math.floor(Math.random()*areas.length)].id;
     var aSore=areas[Math.floor(Math.random()*areas.length)].id;
     list=list.filter(function(x){return!(x.date===ds&&(x.shift==='pagi'||x.shift==='sore'))});
@@ -783,12 +902,12 @@ function genRollingPiket(){
     list.push({id:DB.uid(),areaId:aSore,date:ds,shift:'sore',ts:Date.now()});
   }
   DB.set('piket_kantin',list);
-  toast('Rolling Piket berhasil di-acak!');
+  toast('Rolling Piket berhasil di-acak!'+(skipped>0?' ('+skipped+' hari libur dilewati)':''));
   pgJadwalPiket();
   logAct('Generate rolling piket (acak per shift) '+BULAN[_pkM]+' '+_pkY);
 }
 function savePKEv(date,shift,areaId){var list=DB.get('piket_kantin').filter(function(s){return!(s.date===date&&s.shift===shift)});if(areaId)list.push({id:DB.uid(),areaId:areaId,date:date,shift:shift,ts:Date.now()});DB.set('piket_kantin',list);}
-function bulkPK(){var aId=document.getElementById('bp-a').value;var shift=document.getElementById('bp-s').value;var s=parseInt(document.getElementById('bp-ds').value)||1;var e=parseInt(document.getElementById('bp-de').value)||daysInMonth(_pkY,_pkM);if(!aId){toast('Pilih area','error');return;}var list=DB.get('piket_kantin');for(var d=s;d<=e;d++){var ds=_pkY+'-'+String(_pkM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');if(shift==='pagi'||shift==='both'){list=list.filter(function(x){return!(x.date===ds&&x.shift==='pagi')});list.push({id:DB.uid(),areaId:aId,date:ds,shift:'pagi',ts:Date.now()});}if(shift==='sore'||shift==='both'){list=list.filter(function(x){return!(x.date===ds&&x.shift==='sore')});list.push({id:DB.uid(),areaId:aId,date:ds,shift:'sore',ts:Date.now()});}}DB.set('piket_kantin',list);toast('Di-assign');pgJadwalPiket();}
+function bulkPK(){var aId=document.getElementById('bp-a').value;var shift=document.getElementById('bp-s').value;var s=parseInt(document.getElementById('bp-ds').value)||1;var e=parseInt(document.getElementById('bp-de').value)||daysInMonth(_pkY,_pkM);if(!aId){toast('Pilih area','error');return;}var jam=getJamSettings();var list=DB.get('piket_kantin');var skipped=0;for(var d=s;d<=e;d++){var ds=_pkY+'-'+String(_pkM+1).padStart(2,'0')+'-'+String(d).padStart(2,'0');if(!isActiveDay(ds,jam)){skipped++;continue;}if(shift==='pagi'||shift==='both'){list=list.filter(function(x){return!(x.date===ds&&x.shift==='pagi')});list.push({id:DB.uid(),areaId:aId,date:ds,shift:'pagi',ts:Date.now()});}if(shift==='sore'||shift==='both'){list=list.filter(function(x){return!(x.date===ds&&x.shift==='sore')});list.push({id:DB.uid(),areaId:aId,date:ds,shift:'sore',ts:Date.now()});}}DB.set('piket_kantin',list);toast('Di-assign'+(skipped>0?' ('+skipped+' hari libur dilewati)':''));pgJadwalPiket();}
 
 var _jpY,_jpM;
 function pgJadwalPw(){var now=new Date();if(_jpY===undefined){_jpY=now.getFullYear();_jpM=now.getMonth();}var users=DB.get('users');var depts=[...new Set(users.filter(function(u){return u.role==='pengawas'}).map(function(u){return u.dept}))].filter(Boolean);var h='<div class="card"><div class="card-header"><div class="card-title">Rolling Dept. Pengawas Harian</div><div style="display:flex;gap:5px;align-items:center"><button class="btn btn-outline btn-sm" onclick="_jpM=(_jpM+11)%12;_jpY=_jpM===11?_jpY-1:_jpY;pgJadwalPw()"><i class="fas fa-chevron-left"></i></button><span style="font-weight:600;font-size:11px;min-width:110px;text-align:center">'+BULAN[_jpM]+' '+_jpY+'</span><button class="btn btn-outline btn-sm" onclick="_jpM=(_jpM+1)%12;_jpY=_jpM===0?_jpY+1:_jpY;pgJadwalPw()"><i class="fas fa-chevron-right"></i></button></div></div>';if(depts.length>0){h+='<div class="info-box info-warn"><i class="fas fa-shuffle"></i>Satu Departemen Pengawas akan ditugaskan untuk 1 hari penuh (Pagi/Sore) secara bergantian dan acak.</div>';h+='<button class="btn btn-primary" onclick="genRollingDept()" style="margin-bottom:15px"><i class="fas fa-shuffle"></i> Generate Rolling Dept</button>';}else{h+='<div class="info-box info-warn"><i class="fas fa-exclamation-triangle"></i>Belum ada user dengan role Pengawas.</div>';}h+='<div id="rolling-container"></div></div>';document.getElementById('content').innerHTML=h;renderRollingDept();}
@@ -896,26 +1015,15 @@ function putusTukar(id,decision){
 }
 
 var _ipA='',_ipD='',_ipS='pagi';
-// CATATAN: Penilaian 5R diisi oleh PIC Pelaksana setiap hari untuk area yang menjadi
-// tanggung jawabnya, TIDAK terikat dengan Jadwal Piket Kantin (piket_kantin).
-// Jadwal Piket Kantin (rolling) hanya dipakai untuk Penilaian Piket Kantin (lihat pgInputPK & calcScore).
-function isPelaksanaOnDuty(){
-  if(CU.role!=='pelaksana') return true;
-  if(!CU.areas || CU.areas.length===0) return false; // pelaksana wajib punya area yang di-assign di Master User
-  return true;
-}
-function isPengawasOnDuty(){
-  if(CU.role!=='pengawas') return true;
-  var td=todayStr();
-  var sched=DB.get('rolling_dept_pengawas').filter(function(s){return s.date===td;});
-  return sched.some(function(s){return s.dept===CU.dept;});
-}
+// CATATAN: Penilaian 5R sekarang HANYA diisi oleh SPV, 2x sehari (Pagi & Sore), dan dinilai
+// otomatis oleh AI berdasarkan Master Jam Penilaian -- TIDAK ada lagi upload Pelaksana maupun
+// approval manual Pengawas. Status & poin tiap item (OK/Tidak OK/minus/netral) dihitung otomatis
+// dari jam sekarang dibanding Master Jam (lihat pen_computeStatus). TIDAK terikat dengan Jadwal
+// Piket Kantin (piket_kantin) -- itu dipakai khusus utk Penilaian Piket Kantin (pgInputPK & calcScore).
 function pgInputPen(){
-  if(CU.role==='pelaksana' && !isPelaksanaOnDuty()){document.getElementById('content').innerHTML='<div class="card"><div class="empty-state"><i class="fas fa-lock"></i><p>Akun Anda belum di-assign ke Area manapun. Hubungi Admin di menu Master User agar bisa mengisi Penilaian 5R.</p></div></div>';return;}
-  if(CU.role==='pengawas' && !isPengawasOnDuty()){document.getElementById('content').innerHTML='<div class="card"><div class="empty-state"><i class="fas fa-lock"></i><p>Anda hanya bisa mengisi Penilaian 5R saat jadwal rolling departemen Anda hari ini.</p></div></div>';return;}
   var areas=DB.get('areas');
-  // FILTER KETAT: SPV & PELAKSANA HANYA BISA LIHAT AREA YANG TERHUBUNG DENGAN ID MEREKA
-  if(CU.role==='spv' || CU.role==='pelaksana'){
+  // FILTER KETAT: SPV HANYA BISA LIHAT AREA YANG TERHUBUNG DENGAN ID MEREKA. Admin bebas semua area.
+  if(CU.role==='spv'){
     if(CU.areas && CU.areas.length > 0) {
       areas = areas.filter(function(a){ return CU.areas.indexOf(a.id) !== -1; });
     } else {
@@ -926,54 +1034,60 @@ function pgInputPen(){
   if(!_ipD) _ipD=todayStr();
   var cls=_ipA?DB.get('checklists').filter(function(c){return c.areaId===_ipA}):[];
   var existing=_ipA?penGetRecord(_ipA,_ipD,_ipS):null;
+  var jam=getJamSettings();var now=new Date();
   var h='<div class="card"><div class="card-header"><div class="card-title"><i class="fas fa-pen-to-square" style="color:var(--primary)"></i>Input Penilaian 5R</div></div>';
-  if(CU.role==='spv' || CU.role==='pelaksana'){h+='<div class="info-box info-ok"><i class="fas fa-shield-halved"></i>Akses dibatasi: Anda hanya menilai area yang sudah ditugaskan ke akun Anda.</div>';}
+  if(CU.role==='spv'){h+='<div class="info-box info-ok"><i class="fas fa-shield-halved"></i>Akses dibatasi: Anda hanya menilai area yang sudah ditugaskan ke akun Anda.</div>';}
   h+='<div class="pen-toolbar">';
   h+='<div class="form-group" style="min-width:200px;flex:1"><label class="form-label"><i class="fas fa-map-location-dot"></i> Area</label><select class="form-select" onchange="_ipA=this.value;pgInputPen()">';
   if(areas.length===0) h+='<option>-- Tidak ada area terhubung dengan akun Anda --</option>';
   else areas.forEach(function(a){h+='<option value="'+a.id+'"'+(a.id===_ipA?' selected':'')+'>'+a.name+'</option>';});
   h+='</select></div>';
   h+='<div class="form-group" style="min-width:150px"><label class="form-label"><i class="fas fa-calendar"></i> Tanggal</label><input type="date" class="form-input" value="'+_ipD+'" onchange="_ipD=this.value;pgInputPen()"></div>';
-  h+='<div class="form-group" style="min-width:110px"><label class="form-label"><i class="fas fa-clock"></i> Shift</label><select class="form-select" onchange="_ipS=this.value;pgInputPen()"><option value="pagi"'+(_ipS==='pagi'?' selected':'')+'>Pagi</option><option value="siang"'+(_ipS==='siang'?' selected':'')+'>Siang</option></select></div>';
+  h+='<div class="form-group" style="min-width:110px"><label class="form-label"><i class="fas fa-clock"></i> Shift</label><select class="form-select" onchange="_ipS=this.value;pgInputPen()"><option value="pagi"'+(_ipS==='pagi'?' selected':'')+'>Pagi</option><option value="siang"'+(_ipS==='siang'?' selected':'')+'>Sore</option></select></div>';
   h+='</div>';
-  if(areas.length===0){
+  h+='<div class="info-box info-warn"><i class="fas fa-clock"></i>Jadwal shift '+(_ipS==='pagi'?'Pagi':'Sore')+': Batas Upload <strong>'+(_ipS==='pagi'?jam.uploadPagi:jam.uploadSore)+'</strong>, Batas Perbaikan <strong>'+(_ipS==='pagi'?jam.perbaikanPagi:jam.perbaikanSore)+'</strong>. Lewat dari Batas Perbaikan, poin item dikunci otomatis oleh sistem.'+(CU.role==='admin'?' <a href="#" onclick="nav(\'master-jam\');return false" style="color:inherit;text-decoration:underline">Ubah jadwal</a>.':'')+'</div>';
+  var dayActive=isActiveDay(_ipD,jam);
+  if(!dayActive){
+    h+='<div class="empty-state"><i class="fas fa-mug-hot"></i><p>Hari <strong>'+HARI_LABEL[new Date(_ipD+'T00:00:00').getDay()]+'</strong> ('+fmtD(_ipD)+') bukan Hari Aktif Penilaian 5R.<br>Tidak ada penilaian yang perlu diupload untuk tanggal ini, dan tanggal ini tidak akan dihitung ke skor bulanan.'+(CU.role==='admin'?' <a href="#" onclick="nav(\'master-jam\');return false" style="color:inherit;text-decoration:underline">Atur Hari Aktif</a>.':'')+'</p></div>';
+  }else if(areas.length===0){
     h+='<div class="empty-state"><i class="fas fa-lock"></i><p>Anda belum ditugaskan ke area manapun, sehingga tidak ada yang bisa dinilai.<br>Hubungi Admin untuk di-assign ke area lewat menu <strong>Master User</strong>.</p></div>';
   }else if(cls.length===0){
-    h+='<div class="empty-state"><i class="fas fa-clipboard-list"></i><p>Area <strong>'+(areas.find(function(a){return a.id===_ipA})||{}).name+'</strong> belum punya item Checksheet, jadi form penilaian &amp; tombol Simpan belum bisa ditampilkan.</p>'+(CU.role==='admin'?'<button class="btn btn-primary" style="margin-top:8px" onclick="nav(\'master-checksheet\')"><i class="fas fa-clipboard-check"></i>Buat Checksheet Sekarang</button>':'<p style="font-size:11px;color:var(--text-muted);margin-top:4px">Hubungi Admin untuk membuat Checksheet area ini di menu Master Checksheet.</p>')+'</div>';
+    h+='<div class="empty-state"><i class="fas fa-clipboard-list"></i><p>Area <strong>'+(areas.find(function(a){return a.id===_ipA})||{}).name+'</strong> belum punya item Checksheet, jadi form penilaian belum bisa ditampilkan.</p>'+(CU.role==='admin'?'<button class="btn btn-primary" style="margin-top:8px" onclick="nav(\'master-checksheet\')"><i class="fas fa-clipboard-check"></i>Buat Checksheet Sekarang</button>':'<p style="font-size:11px;color:var(--text-muted);margin-top:4px">Hubungi Admin untuk membuat Checksheet area ini di menu Master Checksheet.</p>')+'</div>';
   }else{
     var ppi=Math.round(100/cls.length*100)/100;
-    var editPic=(CU.role==='admin'||CU.role==='pelaksana');var editSpv=(CU.role==='admin'||CU.role==='spv');var editPw=(CU.role==='admin'||CU.role==='pengawas');
     var myDone=0;
-    cls.forEach(function(c){var it=existing?existing.items.find(function(i){return i.clId===c.id}):null;if(!it)return;if(editPic&&it.picPhoto)myDone++;else if(editSpv&&it.spvPhoto)myDone++;else if(editPw&&(it.pwStatus==='ok'||it.pwStatus==='nok'))myDone++;});
-    h+='<div class="pen-progress-wrap"><i class="fas fa-list-check" style="color:var(--primary)"></i><span class="pen-progress-label">'+myDone+' / '+cls.length+' item</span><div class="progress-bar"><div class="progress-fill" style="width:'+Math.round(myDone/cls.length*100)+'%;background:var(--primary)"></div></div><span class="pen-progress-label" style="color:var(--text-muted);font-weight:600">'+cls.length+' item &times; '+ppi+' = 100 poin</span></div>';
-    if(editPic&&!editSpv&&!editPw)h+='<div class="info-box info-warn"><i class="fas fa-camera"></i>Ambil foto dulu, lalu klik <strong>Simpan Foto</strong> untuk mengunci &amp; menjalankan penilaian AI. Setelah disimpan &amp; dinilai AI, foto <strong>tidak bisa diganti lagi</strong> hari ini.</div>';
-    else if(editSpv&&!editPic&&!editPw)h+='<div class="info-box info-warn"><i class="fas fa-camera"></i>Ambil foto verifikasi dulu, lalu klik <strong>Simpan Foto</strong> untuk mengunci &amp; menjalankan penilaian AI. Setelah disimpan &amp; dinilai AI, foto <strong>tidak bisa diganti lagi</strong> hari ini.</div>';
-    else if(editPw&&!editPic&&!editSpv)h+='<div class="info-box info-warn"><i class="fas fa-check-double"></i>Pilihan <strong>OK / Tidak OK</strong> aktif setelah foto Pelaksana &amp; SPV serta hasil AI keduanya tersedia. Keputusan Anda menentukan item ini dihitung ke skor atau tidak.</div>';
-    h+='<div class="pen-save-hint" style="margin-bottom:10px"><i class="fas fa-circle-info"></i> Setiap foto &amp; approval tersimpan otomatis, tidak perlu tombol Simpan.</div>';
+    cls.forEach(function(c){var it=existing?existing.items.find(function(i){return i.clId===c.id}):null;if(it&&it.photo)myDone++;});
+    h+='<div class="pen-progress-wrap"><i class="fas fa-list-check" style="color:var(--primary)"></i><span class="pen-progress-label">'+myDone+' / '+cls.length+' item diupload</span><div class="progress-bar"><div class="progress-fill" style="width:'+Math.round(myDone/cls.length*100)+'%;background:var(--primary)"></div></div><span class="pen-progress-label" style="color:var(--text-muted);font-weight:600">'+cls.length+' item &times; '+ppi+' = 100 poin</span></div>';
+    h+='<div class="pen-save-hint" style="margin-bottom:10px"><i class="fas fa-circle-info"></i> Setiap foto tersimpan otomatis &amp; langsung dinilai AI, tidak perlu tombol Simpan terpisah.</div>';
     var lastCat=null;var gridOpen=false;var rowNum=0;
     cls.forEach(function(c){
       if(c.cat!==lastCat){
         if(gridOpen)h+='</div></div>';
         lastCat=c.cat;rowNum=0;
-        h+='<div class="chk-section"><div class="chk-cat"><i class="fas fa-tag"></i>'+lastCat+'</div><div class="chk-grid"><div class="chk-head">Deskripsi</div><div class="chk-head">Foto Pelaksana</div><div class="chk-head">Foto SPV</div><div class="chk-head">Rekomendasi AI</div><div class="chk-head">Pengawas</div>';
+        h+='<div class="chk-section"><div class="chk-cat"><i class="fas fa-tag"></i>'+lastCat+'</div><div class="chk-grid"><div class="chk-head">Deskripsi</div><div class="chk-head">Foto Awal (SPV)</div><div class="chk-head">Foto Perbaikan</div><div class="chk-head">Rekomendasi AI</div><div class="chk-head">Status &amp; Poin</div>';
         gridOpen=true;
       }
       rowNum++;var oddCls=(rowNum%2===0)?' chk-item-odd':'';
-      var it=existing?existing.items.find(function(i){return i.clId===c.id}):null;if(!it)it={clId:c.id,picPhoto:null,picAi:null,spvPhoto:null,spvAi:null,pwStatus:'pending'};
+      var it=existing?existing.items.find(function(i){return i.clId===c.id}):null;if(!it)it={clId:c.id,photo:null,ai:null,photoPerbaikan:null,aiPerbaikan:null};
+      var status=pen_computeStatus(it,_ipD,_ipS,jam,now);
+      var canUtama=(CU.role==='admin')||(CU.role==='spv' && status.phase==='upload');
+      var canPerbaikan=(CU.role==='admin')||(CU.role==='spv' && status.phase==='perbaikan');
+      var msgUtama=(status.phase==='upload')?'Menunggu diupload':'Batas upload sudah lewat';
+      var msgPerbaikan=(status.phase==='upload')?'Terbuka jika masih Tidak OK setelah batas upload lewat':((status.code==='ok'||status.code==='diperbaiki')?'Tidak diperlukan (sudah OK)':'Batas perbaikan sudah lewat');
       h+='<div class="chk-desc'+oddCls+'"><span class="chk-row-idx">'+rowNum+'</span>'+c.desc+'</div>';
-      h+=pen_renderPhotoCell(it,'pic',editPic,oddCls);
-      h+=pen_renderPhotoCell(it,'spv',editSpv,oddCls);
+      h+=pen_renderPhotoCell(it,'utama',canUtama,msgUtama,oddCls);
+      h+=pen_renderPhotoCell(it,'perbaikan',canPerbaikan,msgPerbaikan,oddCls);
       h+=pen_renderRecommendCell(it,oddCls);
-      h+=pen_renderApprovalCell(it,editPw,oddCls);
+      h+=pen_renderStatusCell(status,ppi,it,oddCls);
     });
     if(gridOpen)h+='</div></div>';
   }
   h+='</div>';document.getElementById('content').innerHTML=h;
 }
-function pen_renderPhotoCell(it,role,editable,oddCls){
-  var photo=role==='pic'?it.picPhoto:it.spvPhoto;
-  var ai=role==='pic'?it.picAi:it.spvAi;
-  var label=role==='pic'?'Pelaksana':'SPV';
+function pen_renderPhotoCell(it,role,editable,placeholderMsg,oddCls){
+  var photo=role==='utama'?it.photo:it.photoPerbaikan;
+  var ai=role==='utama'?it.ai:it.aiPerbaikan;
+  var label=role==='utama'?'Foto Awal':'Foto Perbaikan';
   var staged=_stagedPhotos[stagedKey(it.clId,role)];
   var html='<div class="chk-cell'+oddCls+' photo-cell" data-label="'+label+'">';
 
@@ -988,8 +1102,8 @@ function pen_renderPhotoCell(it,role,editable,oddCls){
       html+='</div>';
     }
   }else if(photo){
-    // Pelaksana & SPV DISAMAKAN: begitu tersimpan & AI berhasil menilai, terkunci -- tidak bisa
-    // upload ulang lagi hari itu. Admin tetap bisa mengoreksi. Kalau AI gagal/timeout, sediakan
+    // Begitu tersimpan & AI berhasil menilai, terkunci -- SPV tidak bisa upload ulang lagi.
+    // Admin tetap bisa mengoreksi kapan saja. Kalau AI gagal/timeout, sediakan
     // "Nilai Ulang" (tanpa perlu foto baru) supaya tidak ada yang terjebak.
     var aiDone=ai && !ai.failed;
     var lockedForRole=aiDone && CU.role!=='admin';
@@ -1010,43 +1124,42 @@ function pen_renderPhotoCell(it,role,editable,oddCls){
   }else if(editable){
     html+='<label class="photo-upload-btn"><i class="fas fa-camera"></i>Ambil/Upload Foto<input type="file" accept="image/*" capture="environment" style="display:none" onchange="onPickPhotoStage(this,\''+it.clId+'\',\''+role+'\')"></label>';
   }else{
-    html+='<span style="font-size:11px;color:var(--text-muted)">Belum ada foto</span>';
+    html+='<span style="font-size:10px;color:var(--text-muted)">'+(placeholderMsg||'Belum ada foto')+'</span>';
   }
   html+='</div>';
   return html;
 }
+// Kolom Status & Poin: menggantikan kolom Rekomendasi AI + Pengawas lama.
+// Status & poin sepenuhnya otomatis (lihat pen_computeStatus), TIDAK ada approval manual lagi.
+// Kolom Rekomendasi AI: menampilkan temuan/alasan AI begitu ada hasil NOK (awal maupun
+// perbaikan) atau AI gagal menilai -- supaya SPV langsung tahu apa yang perlu diperbaiki
+// tanpa perlu klik/hover apa pun.
 function pen_renderRecommendCell(it,oddCls){
   var html='<div class="chk-cell'+oddCls+'" data-label="Rekomendasi AI" style="flex-direction:column;align-items:flex-start;gap:5px;text-align:left">';
   var rows=[];
-  if(it.picAi && it.picAi.failed) rows.push({who:'Pelaksana',note:it.picAi.note,failed:true});
-  else if(it.picAi && it.picAi.result==='nok') rows.push({who:'Pelaksana',note:it.picAi.note});
-  if(it.spvAi && it.spvAi.failed) rows.push({who:'SPV',note:it.spvAi.note,failed:true});
-  else if(it.spvAi && it.spvAi.result==='nok') rows.push({who:'SPV',note:it.spvAi.note});
+  if(it.ai && it.ai.failed) rows.push({label:'Foto Awal (gagal dinilai)',note:it.ai.note,warn:true});
+  else if(it.ai && it.ai.result==='nok') rows.push({label:'Foto Awal',note:it.ai.note});
+  if(it.aiPerbaikan && it.aiPerbaikan.failed) rows.push({label:'Foto Perbaikan (gagal dinilai)',note:it.aiPerbaikan.note,warn:true});
+  else if(it.aiPerbaikan && it.aiPerbaikan.result==='nok') rows.push({label:'Foto Perbaikan',note:it.aiPerbaikan.note});
   if(rows.length===0){
-    if(it.picAi && it.spvAi) html+='<span style="font-size:11px;color:var(--success)"><i class="fas fa-circle-check"></i> Sudah sesuai standar</span>';
+    if(it.ai && it.ai.result==='ok') html+='<span style="font-size:11px;color:var(--success)"><i class="fas fa-circle-check"></i> Sudah sesuai standar</span>';
+    else if(it.aiPerbaikan && it.aiPerbaikan.result==='ok') html+='<span style="font-size:11px;color:var(--success)"><i class="fas fa-circle-check"></i> Sudah diperbaiki &amp; sesuai standar</span>';
     else html+='<span style="font-size:10px;color:var(--text-muted)">Menunggu hasil AI</span>';
   }else{
     rows.forEach(function(r){
-      html+='<div style="font-size:11px;line-height:1.4"><span style="font-weight:700;color:'+(r.failed?'#92400e':'var(--danger)')+'">Foto '+r.who+(r.failed?' (gagal dinilai)':'')+':</span> '+(r.note||'Tidak sesuai standar, cek kembali kondisi area.')+'</div>';
+      html+='<div style="font-size:11px;line-height:1.4"><span style="font-weight:700;color:'+(r.warn?'#92400e':'var(--danger)')+'">'+r.label+':</span> '+(r.note||'Tidak sesuai standar, cek kembali kondisi area.')+'</div>';
     });
   }
   html+='</div>';
   return html;
 }
-function pen_renderApprovalCell(it,editable,oddCls){
-  var html='<div class="chk-cell'+oddCls+'" data-label="Pwas">';
-  if(it.pwStatus==='ok'){
-    html+='<span class="badge badge-ok" title="Dikonfirmasi oleh '+(it.pwApprovedBy||'-')+'"><i class="fas fa-check-double"></i> OK</span>';
-  }else if(it.pwStatus==='nok'){
-    html+='<span class="badge badge-tidak" title="Dikonfirmasi oleh '+(it.pwApprovedBy||'-')+'"><i class="fas fa-xmark"></i> Tidak OK</span>';
-  }else if(it.pwStatus==='expired'){
-    html+='<span class="badge badge-tidak"><i class="fas fa-clock"></i> Lewat Waktu</span>';
-  }else if(it.picAi&&!it.picAi.failed&&it.spvAi&&!it.spvAi.failed){
-    if(editable)html+='<div style="display:flex;gap:5px"><button class="btn btn-sm btn-primary" onclick="pengawasDecide(\''+it.clId+'\',\'ok\')"><i class="fas fa-check"></i>OK</button><button class="btn btn-sm btn-outline" style="color:var(--danger);border-color:var(--danger)" onclick="pengawasDecide(\''+it.clId+'\',\'nok\')"><i class="fas fa-xmark"></i>Tidak OK</button></div>';
-    else html+='<span class="badge badge-skip">Menunggu Pengawas</span>';
-  }else{
-    html+='<span style="font-size:10px;color:var(--text-muted)">Menunggu foto &amp; penilaian AI</span>';
-  }
+function pen_renderStatusCell(status,ppi,it,oddCls){
+  var html='<div class="chk-cell'+oddCls+'" data-label="Status" style="flex-direction:column;align-items:flex-start;gap:5px;text-align:left">';
+  var badgeCls=(status.poin==='full')?'badge-ok':((status.poin==='minus')?'badge-tidak':'badge-skip');
+  var poinTxt=(status.poin==='full')?('+'+(Math.round(ppi*100)/100)):((status.poin==='minus')?('-'+(Math.round(ppi*100)/100)):((status.poin==='netral')?'0':'-'));
+  var poinColor=(status.poin==='full')?'var(--primary)':((status.poin==='minus')?'var(--danger)':'var(--text-muted)');
+  html+='<span class="badge '+badgeCls+'">'+status.label+'</span>';
+  html+='<span style="font-weight:800;font-size:12px;color:'+poinColor+'">'+poinTxt+' poin</span>';
   html+='</div>';
   return html;
 }
@@ -1059,7 +1172,7 @@ function pgInputMys(){var list=DB.get('mystery').filter(function(i){return i.dat
 function modalMys(){var opts=DB.get('areas').map(function(a){return'<option value="'+a.id+'">'+a.name+'</option>'}).join('');showModal('Tambah Temuan','<div class="form-group"><label class="form-label">Area</label><select class="form-select" id="f-ma">'+opts+'</select></div><div class="form-group"><label class="form-label">Temuan</label><textarea class="form-textarea" id="f-md"></textarea></div>','<button class="btn btn-outline" onclick="hideModal()">Batal</button><button class="btn btn-primary" onclick="saveMys()">Simpan</button>');}
 function saveMys(){var d=document.getElementById('f-md').value.trim();if(!d){toast('Temuan wajib','error');return;}var list=DB.get('mystery');list.push({id:DB.uid(),areaId:document.getElementById('f-ma').value,date:todayStr(),desc:d,ts:Date.now()});DB.set('mystery',list);hideModal();toast('Ditambahkan');pgInputMys();}
 
-function pgInputPK(){var td=todayStr();var duties=DB.get('piket_kantin').filter(function(p){return p.date===td});var areas=DB.get('areas');var ks=getKantinSettings();var h='<div class="card"><div class="card-header"><div class="card-title">Piket Kantin Hari Ini ('+fmtD(td)+')</div></div>';var shifts=['pagi','sore'];shifts.forEach(function(shift){var duty=duties.find(function(d){return d.shift===shift});var a=duty?areas.find(function(x){return x.id===duty.areaId}):null;h+='<div style="margin-bottom:12px;padding:10px;border:1px solid var(--border);border-radius:8px"><div style="font-weight:700;font-size:12px;margin-bottom:6px;text-transform:capitalize">Shift '+shift+' <span style="font-weight:400;color:var(--text-muted)">('+(shift==='pagi'?ks.shiftPagi:ks.shiftSore)+')</span></div>';if(a){h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:12px">Area piket: <strong>'+a.name+'</strong></span>';var res=DB.get('pk_result').find(function(r){return r.date===td&&r.shift===shift});if(res&&res.verified){h+=res.clean?'<span class="badge badge-ok">Bersih (Terverifikasi, +'+ks.bonus+')</span>':'<span class="badge badge-tidak">Kotor (Terverifikasi, -'+ks.penalty+')</span>';}else if(res){h+='<span class="badge badge-skip">Menunggu Verifikasi</span> <span style="font-size:11px">Hasil: '+(res.clean?'Bersih':'Kotor')+'</span>';if(CU.role==='admin'||CU.role==='pengawas'){h+=' <button class="btn btn-sm btn-primary" onclick="verifyPKRes(\''+shift+'\')"><i class="fas fa-check"></i>Verifikasi</button>';}}else{h+='<button class="btn btn-sm btn-primary" onclick="inputPKRes(\''+shift+'\')">Isi Hasil</button>';}h+='</div>';}else{h+='<span style="font-size:11px;color:var(--text-muted)">Tidak ada jadwal piket untuk shift ini.</span>';}h+='</div>';});h+='</div>';document.getElementById('content').innerHTML=h;}
+function pgInputPK(){var td=todayStr();var jam=getJamSettings();var h='<div class="card"><div class="card-header"><div class="card-title">Piket Kantin Hari Ini ('+fmtD(td)+')</div></div>';if(!isActiveDay(td,jam)){h+='<div class="empty-state"><i class="fas fa-mug-hot"></i><p>Hari <strong>'+HARI_LABEL[new Date(td+'T00:00:00').getDay()]+'</strong> bukan Hari Aktif, jadi tidak ada piket kantin hari ini.</p></div></div>';document.getElementById('content').innerHTML=h;return;}var duties=DB.get('piket_kantin').filter(function(p){return p.date===td});var areas=DB.get('areas');var ks=getKantinSettings();var shifts=['pagi','sore'];shifts.forEach(function(shift){var duty=duties.find(function(d){return d.shift===shift});var a=duty?areas.find(function(x){return x.id===duty.areaId}):null;h+='<div style="margin-bottom:12px;padding:10px;border:1px solid var(--border);border-radius:8px"><div style="font-weight:700;font-size:12px;margin-bottom:6px;text-transform:capitalize">Shift '+shift+' <span style="font-weight:400;color:var(--text-muted)">('+(shift==='pagi'?ks.shiftPagi:ks.shiftSore)+')</span></div>';if(a){h+='<div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap"><span style="font-size:12px">Area piket: <strong>'+a.name+'</strong></span>';var res=DB.get('pk_result').find(function(r){return r.date===td&&r.shift===shift});if(res&&res.verified){h+=res.clean?'<span class="badge badge-ok">Bersih (Terverifikasi, +'+ks.bonus+')</span>':'<span class="badge badge-tidak">Kotor (Terverifikasi, -'+ks.penalty+')</span>';}else if(res){h+='<span class="badge badge-skip">Menunggu Verifikasi</span> <span style="font-size:11px">Hasil: '+(res.clean?'Bersih':'Kotor')+'</span>';if(CU.role==='admin'||CU.role==='pengawas'){h+=' <button class="btn btn-sm btn-primary" onclick="verifyPKRes(\''+shift+'\')"><i class="fas fa-check"></i>Verifikasi</button>';}}else{h+='<button class="btn btn-sm btn-primary" onclick="inputPKRes(\''+shift+'\')">Isi Hasil</button>';}h+='</div>';}else{h+='<span style="font-size:11px;color:var(--text-muted)">Tidak ada jadwal piket untuk shift ini.</span>';}h+='</div>';});h+='</div>';document.getElementById('content').innerHTML=h;}
 function inputPKRes(shift){var td=todayStr();showModal('Hasil Piket '+shift,'<div class="form-group"><label class="form-label">Kondisi Kantin</label><select class="form-select" id="f-pkc"><option value="1">Bersih</option><option value="0">Kotor</option></select></div>','<button class="btn btn-outline" onclick="hideModal()">Batal</button><button class="btn btn-primary" onclick="savePKRes(\''+shift+'\')">Simpan</button>');}
 function savePKRes(shift){var td=todayStr();var list=DB.get('pk_result').filter(function(r){return!(r.date===td&&r.shift===shift)});list.push({id:DB.uid(),date:td,shift:shift,clean:document.getElementById('f-pkc').value==='1',verified:false,ts:Date.now()});DB.set('pk_result',list);hideModal();toast('Tersimpan, menunggu verifikasi');logAct('Isi hasil piket kantin shift '+shift+' ('+td+')');pgInputPK();}
 function verifyPKRes(shift){var td=todayStr();var list=DB.get('pk_result');var r=list.find(function(x){return x.date===td&&x.shift===shift;});if(!r){toast('Data tidak ditemukan','error');return;}r.verified=true;r.verifiedBy=CU.id;DB.set('pk_result',list,function(ok){if(ok){toast('Hasil piket kantin diverifikasi');logAct('Verifikasi hasil piket kantin shift '+shift+' ('+td+')');pgInputPK();}});}
@@ -1082,22 +1195,10 @@ function generateMonthlySummary(){
 var _klY,_klM;
 function pgKlasemen(){var now=new Date();if(_klY===undefined){_klY=now.getFullYear();_klM=now.getMonth();}var areas=DB.get('areas').filter(function(a){return a.type==='lomba'});var scores=[];areas.forEach(function(a){var s=calcScore(a.id,_klY,_klM);if(s)scores.push(s);});scores.sort(function(a,b){return b.final-a.final});var h='<div class="card"><div class="card-header"><div class="card-title">Klasemen Lomba 5R</div><div style="display:flex;gap:5px;align-items:center"><button class="btn btn-outline btn-sm" onclick="_klM=(_klM+11)%12;_klY=_klM===11?_klY-1:_klY;pgKlasemen()"><i class="fas fa-chevron-left"></i></button><span style="font-weight:600;font-size:11px;min-width:110px;text-align:center">'+BULAN[_klM]+' '+_klY+'</span><button class="btn btn-outline btn-sm" onclick="_klM=(_klM+1)%12;_klY=_klM===0?_klY+1:_klY;pgKlasemen()"><i class="fas fa-chevron-right"></i></button></div></div>';if(scores.length<3){h+='<div class="empty-state"><i class="fas fa-trophy"></i><p>Minimal 3 area lomba dengan data penilaian untuk menampilkan podium.</p></div>';}else{h+='<div class="podium">';for(var i=0;i<3;i++){h+='<div class="podium-item podium-'+(i+1)+'"><div class="podium-bar">'+(i+1)+'</div><div class="podium-label">'+scores[i].area.name+'<br><small>('+scores[i].final+')</small></div></div>';}h+='</div>';}h+='<table style="margin-top:15px"><thead><tr><th>Peringkat</th><th>Area</th><th>Skor Akhir</th></tr></thead><tbody>';scores.forEach(function(s,i){h+='<tr><td style="font-weight:800">'+(i+1)+'</td><td style="font-weight:600">'+s.area.name+'</td><td style="font-weight:800;color:var(--primary)">'+s.final+'</td></tr>';});h+='</tbody></table></div>';document.getElementById('content').innerHTML=h;}
 
-// Kalau tanggal sudah lewat (bukan hari ini lagi) dan Pengawas belum sempat cek (masih 'skip'/kosong),
-// otomatis ubah jadi 'tidak' (artinya: Pengawas tidak periksa). Dijalankan tiap kali aplikasi dibuka.
-function autoCloseMissedPengawas(){
-  var today=todayStr();
-  var list=getAllPenilaian();
-  list.forEach(function(p){
-    if(p.date<today && !p.pwAutoClosed){
-      var changed=false;
-      p.items.forEach(function(it){ if(it.pwStatus==='pending'){ it.pwStatus='expired'; it.pwAuto=true; changed=true; } });
-      p.pwAutoClosed=true;
-      // Simpan HANYA record ini (key sendiri), bukan seluruh data penilaian, supaya
-      // tidak menimpa perubahan record lain yang mungkin sedang disimpan device lain.
-      if(changed) DB.set(penKey(p.areaId,p.date,p.shift), p);
-    }
-  });
-}
+// CATATAN: Fungsi auto-tutup Pengawas (autoCloseMissedPengawas) sudah TIDAK DIPAKAI lagi --
+// approval manual Pengawas dihapus. Status & poin tiap item sekarang murni dihitung otomatis
+// dari jam saat ini dibanding Master Jam Penilaian (lihat pen_computeStatus), tanpa perlu
+// proses "tutup paksa" terpisah.
 
 // Migrasi satu kali: pindahkan data lama (key tunggal 'penilaian' berisi array besar)
 // ke format baru (satu key per record). Aman dijalankan berkali-kali -- kalau data lama
@@ -1118,10 +1219,9 @@ document.getElementById('top-date').textContent=new Date().toLocaleDateString('i
 loadAllDataFromServer(function(){
   migrateOldPenilaian(function(){
     ensureAdmin();
-    autoCloseMissedPengawas();
     var s=getSession();if(s){CU=s;}
     applyBranding();
-    if(s){document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='flex';buildMenu();buildSidebarUser();nav('dashboard');}
+    if(s){document.getElementById('login-screen').style.display='none';document.getElementById('app').style.display='flex';buildMenu();buildSidebarUser();applySidebarCollapsePref();nav('dashboard');}
   });
 });
 </script>
