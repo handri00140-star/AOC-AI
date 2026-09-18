@@ -316,7 +316,7 @@ function logAct(desc){var a=DB.get('activities');a.push({id:DB.uid(),desc:desc,d
 
 // ==== PENILAIAN BERBASIS FOTO + AI ====
 // Kompres foto sebelum disimpan sebagai base64 di database JSON (biar payload tidak membengkak)
-function compressPhoto(file,cb){
+function compressPhoto(file,cb,wmText){
   var reader=new FileReader();
   reader.onload=function(ev){
     var img=new Image();
@@ -325,12 +325,58 @@ function compressPhoto(file,cb){
       var w=Math.round(img.width*scale)||1,h=Math.round(img.height*scale)||1;
       var canvas=document.createElement('canvas');canvas.width=w;canvas.height=h;
       canvas.getContext('2d').drawImage(img,0,0,w,h);
-      cb(canvas.toDataURL('image/jpeg',0.6));
+      // Hash dihitung dari isi foto SEBELUM watermark ditempel -- watermark memuat
+      // jam:menit upload, jadi kalau dihitung sesudahnya, foto identik yang diupload
+      // ulang di waktu berbeda akan selalu punya hash berbeda (deteksi duplikat gagal total).
+      var cleanDataUrl=canvas.toDataURL('image/jpeg',0.6);
+      if(wmText)drawWatermark(canvas,wmText);
+      var finalDataUrl=canvas.toDataURL('image/jpeg',0.6);
+      cb(finalDataUrl,cleanDataUrl);
     };
-    img.onerror=function(){cb(ev.target.result);};
+    img.onerror=function(){cb(ev.target.result,ev.target.result);};
     img.src=ev.target.result;
   };
   reader.readAsDataURL(file);
+}
+// Watermark tertanam langsung di pixel foto (timestamp+area+item) -- lebih susah
+// dipalsukan dibanding metadata EXIF yang gampang dihapus/diedit.
+function drawWatermark(canvas,text){
+  var ctx=canvas.getContext('2d');var w=canvas.width,h=canvas.height;
+  var lines=String(text).split('\n');
+  var fontSize=Math.max(9,Math.round(w*0.032));
+  ctx.font=fontSize+'px sans-serif';
+  var padding=5,lineH=fontSize+3;
+  var boxH=lines.length*lineH+padding*2;
+  ctx.fillStyle='rgba(0,0,0,0.55)';ctx.fillRect(0,h-boxH,w,boxH);
+  ctx.fillStyle='#fff';ctx.textBaseline='top';
+  lines.forEach(function(line,i){ctx.fillText(line,padding,h-boxH+padding+i*lineH);});
+}
+// Hash SHA-256 dari isi foto (setelah kompresi) -- dipakai untuk deteksi kalau SPV
+// upload ulang foto yang sama persis dengan hari/shift sebelumnya di area yang sama.
+function computePhotoHash(dataUrl,cb){
+  try{
+    if(!(window.crypto&&window.crypto.subtle)){cb(null);return;}
+    var base64=dataUrl.split(',')[1];var bin=atob(base64);
+    var bytes=new Uint8Array(bin.length);
+    for(var i=0;i<bin.length;i++)bytes[i]=bin.charCodeAt(i);
+    window.crypto.subtle.digest('SHA-256',bytes.buffer).then(function(buf){
+      var hex=Array.from(new Uint8Array(buf)).map(function(b){return b.toString(16).padStart(2,'0');}).join('');
+      cb(hex);
+    }).catch(function(){cb(null);});
+  }catch(e){cb(null);}
+}
+// Cari record lama (area sama, item sama, jenis foto sama) yang punya hash identik.
+function findDuplicatePhotoHash(hash,areaId,clId,role,curDate,curShift){
+  if(!hash)return null;
+  var field=role==='utama'?'photoHash':'photoHashPerbaikan';
+  var found=null;
+  getAllPenilaian().forEach(function(rec){
+    if(rec.areaId!==areaId)return;
+    if(rec.date===curDate&&rec.shift===curShift)return;
+    var it=(rec.items||[]).find(function(i){return i.clId===clId;});
+    if(it&&it[field]&&it[field]===hash){if(!found||rec.date>found.date)found={date:rec.date,shift:rec.shift};}
+  });
+  return found;
 }
 // AI Vision beneran: manggil Supabase Edge Function 'assess-photo' yang meneruskan ke Gemini
 var AI_FUNCTION_URL = SUPABASE_URL + '/functions/v1/assess-photo';
@@ -382,29 +428,39 @@ function onPickPhotoStage(inputEl,clId,role){
     toast('Foto ini sudah tersimpan & dinilai AI, tidak bisa diganti lagi.','error');inputEl.value='';return;
   }
   var cell=inputEl.closest('.photo-cell');if(cell)cell.classList.add('photo-loading');
-  compressPhoto(file,function(dataUrl){
-    _stagedPhotos[stagedKey(clId,role)]=dataUrl;
+  var clObj=DB.get('checklists').find(function(c){return c.id===clId});
+  var areaObj=DB.get('areas').find(function(a){return a.id===_ipA});
+  var timeStr=new Date().toLocaleTimeString('id-ID',{hour:'2-digit',minute:'2-digit'});
+  var wmText=(areaObj?areaObj.name:'')+' | '+_ipD+' '+timeStr+' ('+_ipS+')'+(clObj?'\n'+clObj.desc.substring(0,42):'');
+  compressPhoto(file,function(dataUrl,cleanDataUrl){
+    _stagedPhotos[stagedKey(clId,role)]={display:dataUrl,hashSource:cleanDataUrl};
     pgInputPen();
-  });
+  },wmText);
 }
 function cancelStagedPhoto(clId,role){
   delete _stagedPhotos[stagedKey(clId,role)];
   pgInputPen();
 }
 function saveStagedPhoto(clId,role){
-  var dataUrl=_stagedPhotos[stagedKey(clId,role)];
-  if(!dataUrl){toast('Tidak ada foto untuk disimpan, ambil foto dulu.','error');return;}
+  var staged=_stagedPhotos[stagedKey(clId,role)];
+  if(!staged){toast('Tidak ada foto untuk disimpan, ambil foto dulu.','error');return;}
+  var dataUrl=staged.display;
   var cls=DB.get('checklists').filter(function(c){return c.areaId===_ipA});
   var existing=pen_getRecord();
   var items=pen_getItems(cls,existing);
   var it=items.find(function(i){return i.clId===clId});
   var clObj=cls.find(function(c){return c.id===clId});
-  if(role==='utama'){it.photo=dataUrl;it.ai=null;}else{it.photoPerbaikan=dataUrl;it.aiPerbaikan=null;}
+  computePhotoHash(staged.hashSource,function(hash){
+  var dup=findDuplicatePhotoHash(hash,_ipA,clId,role,_ipD,_ipS);
+  if(role==='utama'){it.photo=dataUrl;it.photoRaw=staged.hashSource;it.ai=null;it.photoHash=hash;it.dupInfo=dup;}else{it.photoPerbaikan=dataUrl;it.photoRawPerbaikan=staged.hashSource;it.aiPerbaikan=null;it.photoHashPerbaikan=hash;it.dupInfoPerbaikan=dup;}
   pen_saveItems(items);
   delete _stagedPhotos[stagedKey(clId,role)];
   pgInputPen();
-  toast('Foto disimpan, sedang dinilai AI...');
-  aiAssessPhoto(clObj?clObj.desc:'',dataUrl,clObj?clObj.refPhoto:null,function(aiRes){
+  if(dup)toast('Peringatan: foto ini terdeteksi identik dengan foto tanggal '+dup.date+' ('+dup.shift+'). Ditandai untuk direview Admin di Log Keputusan AI.','error');
+  else toast('Foto disimpan, sedang dinilai AI...');
+  // Kirim versi BERSIH (tanpa watermark) ke AI, supaya banner watermark di foto lapangan
+  // tidak dianggap "perbedaan" dibanding foto referensi (yang memang tidak ada watermark-nya).
+  aiAssessPhoto(clObj?clObj.desc:'',staged.hashSource,clObj?clObj.refPhoto:null,function(aiRes){
     var rec=pen_getRecord();if(!rec)return;
     var it2=rec.items.find(function(i){return i.clId===clId});if(!it2)return;
     if(role==='utama')it2.ai=aiRes;else it2.aiPerbaikan=aiRes;
@@ -412,19 +468,23 @@ function saveStagedPhoto(clId,role){
     if(!aiRes.failed) toast('AI menilai foto: '+(aiRes.result==='ok'?'Sesuai standar':'Tidak sesuai standar'),aiRes.result==='ok'?'success':'error');
     if(curPage==='input-penilaian')pgInputPen();
   });
+  });
 }
 function retryAiForItem(clId,role){
   // Foto SUDAH tersimpan tapi AI gagal/timeout sebelumnya -- nilai ulang tanpa perlu upload ulang.
   var rec=pen_getRecord();if(!rec)return;
   var it=rec.items.find(function(i){return i.clId===clId});if(!it)return;
   var photo=role==='utama'?it.photo:it.photoPerbaikan;
+  // Pakai versi bersih (tanpa watermark) yang tersimpan, kalau ada -- konsisten dengan
+  // penilaian pertama. Fallback ke versi ber-watermark untuk foto lama sebelum fitur ini ada.
+  var photoRaw=(role==='utama'?it.photoRaw:it.photoRawPerbaikan)||photo;
   if(!photo){toast('Belum ada foto tersimpan untuk item ini.','error');return;}
   var cls=DB.get('checklists').filter(function(c){return c.areaId===_ipA});
   var clObj=cls.find(function(c){return c.id===clId});
   if(role==='utama')it.ai=null;else it.aiPerbaikan=null;
   DB.set(penKey(rec.areaId,rec.date,rec.shift),rec);
   pgInputPen();
-  aiAssessPhoto(clObj?clObj.desc:'',photo,clObj?clObj.refPhoto:null,function(aiRes){
+  aiAssessPhoto(clObj?clObj.desc:'',photoRaw,clObj?clObj.refPhoto:null,function(aiRes){
     var rec2=pen_getRecord();if(!rec2)return;
     var it2=rec2.items.find(function(i){return i.clId===clId});if(!it2)return;
     if(role==='utama')it2.ai=aiRes;else it2.aiPerbaikan=aiRes;
@@ -482,7 +542,7 @@ function doLogout(){CU=null;clearSession();applyThemeColor(computeEffectiveTheme
 document.getElementById('login-pass').addEventListener('keydown',function(e){if(e.key==='Enter')doLogin()});
 document.getElementById('login-user').addEventListener('keydown',function(e){if(e.key==='Enter')document.getElementById('login-pass').focus()});
 
-var MENU_DEF=[{id:'dashboard',icon:'fa-gauge-high',label:'Dashboard',roles:['admin','pengawas','spv','pelaksana'],group:'Utama'},{id:'preferensi-tampilan',icon:'fa-palette',label:'Preferensi Tampilan',roles:['admin','pengawas','spv','pelaksana'],group:'Utama'},{id:'app-settings',icon:'fa-gear',label:'Pengaturan Aplikasi',roles:['admin'],group:'Utama'},{id:'pengaturan-ai',icon:'fa-robot',label:'Pengaturan AI',roles:['admin'],group:'Utama'},{id:'master-area',icon:'fa-map-location-dot',label:'Master Area',roles:['admin'],group:'Master Data'},{id:'master-checksheet',icon:'fa-clipboard-check',label:'Master Checksheet',roles:['admin'],group:'Master Data'},{id:'master-user',icon:'fa-users-gear',label:'Master User',roles:['admin'],group:'Master Data'},{id:'master-kantin',icon:'fa-utensils',label:'Master Kantin',roles:['admin'],group:'Master Data'},{id:'master-jam',icon:'fa-clock',label:'Master Jam Penilaian',roles:['admin'],group:'Master Data'},{id:'jadwal-piket',icon:'fa-calendar-check',label:'Jadwal Piket Kantin',roles:['admin'],group:'Jadwal'},{id:'input-penilaian',icon:'fa-pen-to-square',label:'Penilaian 5R',roles:['admin','spv'],group:'Input Penilaian'},{id:'input-inisiatif',icon:'fa-lightbulb',label:'Inisiatif',roles:['admin','pengawas','spv','pelaksana'],group:'Input Penilaian'},{id:'input-mystery',icon:'fa-user-secret',label:'Mystery Guest',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'input-piket-kantin',icon:'fa-utensils',label:'Piket Kantin',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'rekap-bulanan',icon:'fa-chart-bar',label:'Rekap Bulanan',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'},{id:'klasemen',icon:'fa-trophy',label:'Klasemen Lomba',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'}];
+var MENU_DEF=[{id:'dashboard',icon:'fa-gauge-high',label:'Dashboard',roles:['admin','pengawas','spv','pelaksana'],group:'Utama'},{id:'preferensi-tampilan',icon:'fa-palette',label:'Preferensi Tampilan',roles:['admin','pengawas','spv','pelaksana'],group:'Utama'},{id:'app-settings',icon:'fa-gear',label:'Pengaturan Aplikasi',roles:['admin'],group:'Utama'},{id:'pengaturan-ai',icon:'fa-robot',label:'Pengaturan AI',roles:['admin'],group:'Utama'},{id:'master-area',icon:'fa-map-location-dot',label:'Master Area',roles:['admin'],group:'Master Data'},{id:'master-checksheet',icon:'fa-clipboard-check',label:'Master Checksheet',roles:['admin'],group:'Master Data'},{id:'master-user',icon:'fa-users-gear',label:'Master User',roles:['admin'],group:'Master Data'},{id:'master-kantin',icon:'fa-utensils',label:'Master Kantin',roles:['admin'],group:'Master Data'},{id:'master-jam',icon:'fa-clock',label:'Master Jam Penilaian',roles:['admin'],group:'Master Data'},{id:'jadwal-piket',icon:'fa-calendar-check',label:'Jadwal Piket Kantin',roles:['admin'],group:'Jadwal'},{id:'input-penilaian',icon:'fa-pen-to-square',label:'Penilaian 5R',roles:['admin','spv'],group:'Input Penilaian'},{id:'input-inisiatif',icon:'fa-lightbulb',label:'Inisiatif',roles:['admin','pengawas','spv','pelaksana'],group:'Input Penilaian'},{id:'input-mystery',icon:'fa-user-secret',label:'Mystery Guest',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'input-piket-kantin',icon:'fa-utensils',label:'Piket Kantin',roles:['admin','pengawas'],group:'Input Penilaian'},{id:'rekap-bulanan',icon:'fa-chart-bar',label:'Rekap Bulanan',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'},{id:'klasemen',icon:'fa-trophy',label:'Klasemen Lomba',roles:['admin','pengawas','spv','pelaksana'],group:'Laporan'},{id:'log-ai',icon:'fa-magnifying-glass-chart',label:'Log Keputusan AI',roles:['admin','pengawas'],group:'Laporan'}];
 var PAGE_TITLES={};MENU_DEF.forEach(function(m){PAGE_TITLES[m.id]=m.label});
 function canAccess(pageId){var m=MENU_DEF.find(function(x){return x.id===pageId});if(!m||!CU)return false;return m.roles.indexOf(CU.role)>=0;}
 function menuBadgeHtml(m){return '';}
@@ -508,10 +568,10 @@ function applySidebarCollapsePref(){
 function buildSidebarUser(){if(!CU){document.getElementById('sidebar-user').innerHTML='';return;}var colors={admin:'#ef4444',pengawas:'#3b82f6',spv:'#f59e0b',pelaksana:'#6366f1'};var initials=CU.name.split(' ').map(function(w){return w[0]}).join('').substring(0,2).toUpperCase();document.getElementById('sidebar-user').innerHTML='<div class="sidebar-avatar" style="background:'+colors[CU.role]+'">'+initials+'</div><div class="sidebar-userinfo"><div class="name">'+CU.name+'</div><div class="role">'+ROLES[CU.role]+'</div></div>';}
 var curPage='dashboard';
 function refreshCU(){if(!CU)return;var fresh=DB.get('users').find(function(x){return x.id===CU.id});if(fresh){CU=fresh;setSession(fresh);}}
-function nav(pg){refreshCU();if(!canAccess(pg)){document.getElementById('content').innerHTML='<div class="no-access"><i class="fas fa-lock"></i><p>Anda tidak memiliki akses.</p></div>';return;}curPage=pg;document.querySelectorAll('.menu-item').forEach(function(m){m.classList.toggle('active',m.getAttribute('data-page')===pg)});document.getElementById('page-title').textContent=PAGE_TITLES[pg]||'';var fn={dashboard:pgDashboard,'preferensi-tampilan':pgPreferensiTampilan,'app-settings':pgAppSettings,'pengaturan-ai':pgPengaturanAI,'master-area':pgMasterArea,'master-checksheet':pgMasterCheck,'master-user':pgMasterUser,'master-kantin':pgMasterKantin,'master-jam':pgMasterJam,'jadwal-piket':pgJadwalPiket,'input-penilaian':pgInputPen,'input-inisiatif':pgInputIni,'input-mystery':pgInputMys,'input-piket-kantin':pgInputPK,'rekap-bulanan':pgRekap,klasemen:pgKlasemen};if(fn[pg])fn[pg]();else document.getElementById('content').innerHTML='<div class="empty-state"><p>Halaman belum tersedia.</p></div>';document.getElementById('sidebar').classList.remove('open');}
+function nav(pg){refreshCU();if(!canAccess(pg)){document.getElementById('content').innerHTML='<div class="no-access"><i class="fas fa-lock"></i><p>Anda tidak memiliki akses.</p></div>';return;}curPage=pg;document.querySelectorAll('.menu-item').forEach(function(m){m.classList.toggle('active',m.getAttribute('data-page')===pg)});document.getElementById('page-title').textContent=PAGE_TITLES[pg]||'';var fn={dashboard:pgDashboard,'preferensi-tampilan':pgPreferensiTampilan,'app-settings':pgAppSettings,'pengaturan-ai':pgPengaturanAI,'master-area':pgMasterArea,'master-checksheet':pgMasterCheck,'master-user':pgMasterUser,'master-kantin':pgMasterKantin,'master-jam':pgMasterJam,'jadwal-piket':pgJadwalPiket,'input-penilaian':pgInputPen,'input-inisiatif':pgInputIni,'input-mystery':pgInputMys,'input-piket-kantin':pgInputPK,'rekap-bulanan':pgRekap,klasemen:pgKlasemen,'log-ai':pgLogAI};if(fn[pg])fn[pg]();else document.getElementById('content').innerHTML='<div class="empty-state"><p>Halaman belum tersedia.</p></div>';document.getElementById('sidebar').classList.remove('open');}
 var _charts={};function mkChart(id,cfg){if(_charts[id]){_charts[id].destroy();delete _charts[id];}var el=document.getElementById(id);if(!el)return;_charts[id]=new Chart(el,cfg);}
 
-function calcScore(areaId,y,m){var area=DB.get('areas').find(function(a){return a.id===areaId});if(!area)return null;var cls=DB.get('checklists').filter(function(c){return c.areaId===areaId});var n=cls.length;if(n===0)return{base:0,initB:0,mysP:0,kantB:0,kantP:0,final:0,area:area};var ppi=100/n;var jam=getJamSettings();var now=new Date();var pen=getAllPenilaian().filter(function(p){return p.areaId===areaId&&p.date.substring(0,7)===mPrefix(y,m)});var dates=allDates(y,m);var daily=[];dates.forEach(function(date){if(!isActiveDay(date,jam))return;var shifts=[];['pagi','siang'].forEach(function(shift){var dl=pen_deadlines(date,shift,jam);if(now<dl.upload)return;var rec=pen.find(function(p){return p.date===date&&p.shift===shift});var t=0;cls.forEach(function(cl){var it=rec?rec.items.find(function(i){return i.clId===cl.id}):null;if(!it)it={clId:cl.id,photo:null,ai:null,photoPerbaikan:null,aiPerbaikan:null};var st=pen_computeStatus(it,date,shift,jam,now);if(st.poin==='full')t+=ppi;else if(st.poin==='minus')t-=ppi;});shifts.push(t);});if(shifts.length>0)daily.push(shifts.reduce(function(a,b){return a+b},0)/shifts.length);});var base=daily.reduce(function(a,b){return a+b},0);var pf=mPrefix(y,m);var initB=DB.get('inisiatif').filter(function(i){return i.areaId===areaId&&i.date.substring(0,7)===pf}).length*25;var mysP=DB.get('mystery').filter(function(x){return x.areaId===areaId&&x.date.substring(0,7)===pf}).length*25;var ks=getKantinSettings();var kantB=0,kantP=0;DB.get('pk_result').forEach(function(r){if(r.date.substring(0,7)!==pf)return;var okVerif=ks.wajibVerifikasi?!!r.verified:true;if(!okVerif)return;var duty=getDuty(r.date,r.shift);if(duty!==areaId)return;if(r.clean)kantB+=ks.bonus;else kantP+=ks.penalty;});var fin=base+initB-mysP+kantB-kantP;if(area.type==='non-lomba'&&fin>100)fin=100;return{base:Math.round(base*100)/100,initB:initB,mysP:mysP,kantB:kantB,kantP:kantP,final:Math.round(fin*100)/100,area:area};}
+function calcScore(areaId,y,m){var area=DB.get('areas').find(function(a){return a.id===areaId});if(!area)return null;var cls=DB.get('checklists').filter(function(c){return c.areaId===areaId});var n=cls.length;if(n===0)return{base:0,initB:0,mysP:0,kantB:0,kantP:0,final:0,area:area};var ppi=100/n;var jam=getJamSettings();var now=new Date();var pen=getAllPenilaian().filter(function(p){return p.areaId===areaId&&p.date.substring(0,7)===mPrefix(y,m)});var dates=allDates(y,m);var daily=[];dates.forEach(function(date){if(!isActiveDay(date,jam))return;var shifts=[];['pagi','siang'].forEach(function(shift){var dl=pen_deadlines(date,shift,jam);if(now<dl.upload)return;var rec=pen.find(function(p){return p.date===date&&p.shift===shift});var t=0;cls.forEach(function(cl){var it=rec?rec.items.find(function(i){return i.clId===cl.id}):null;if(!it)it={clId:cl.id,photo:null,ai:null,photoPerbaikan:null,aiPerbaikan:null};var st=pen_computeStatus(it,date,shift,jam,now);if(st.poin==='full')t+=ppi;else if(st.poin==='minus')t-=ppi;});shifts.push(t);});if(shifts.length>0)daily.push(shifts.reduce(function(a,b){return a+b},0)/shifts.length);});var base=daily.reduce(function(a,b){return a+b},0);var pf=mPrefix(y,m);var initB=DB.get('inisiatif').filter(function(i){return i.areaId===areaId&&i.date.substring(0,7)===pf}).length*25;var mysP=DB.get('mystery').filter(function(x){return x.areaId===areaId&&x.date.substring(0,7)===pf}).length*25;var ks=getKantinSettings();var kantB=0,kantP=0;DB.get('pk_result').forEach(function(r){if(r.date.substring(0,7)!==pf)return;var okVerif=ks.wajibVerifikasi?!!r.verified:true;if(!okVerif)return;var duty=getDuty(r.date,r.shift);if(duty!==areaId)return;if(r.clean)kantB+=ks.bonus;else kantP+=ks.penalty;});var fin=base+initB-mysP+kantB-kantP;if(area.type==='non-lomba'&&fin>100)fin=100;var activeDays=daily.length;var perHari=activeDays>0?Math.round((fin/activeDays)*100)/100:0;return{base:Math.round(base*100)/100,initB:initB,mysP:mysP,kantB:kantB,kantP:kantP,final:Math.round(fin*100)/100,activeDays:activeDays,perHari:perHari,area:area};}
 function getDuty(date,shift){var s=DB.get('piket_kantin').find(function(p){return p.date===date&&p.shift===shift});return s?s.areaId:null;}
 
 function getAiSettings(){var s=DB.get('ai_settings');if(!s||Array.isArray(s))s={};return{model:(s.model||'gemini-3.6-flash')};}
@@ -976,13 +1036,14 @@ function pgInputPen(){
 function pen_renderPhotoCell(it,role,editable,placeholderMsg,oddCls){
   var photo=role==='utama'?it.photo:it.photoPerbaikan;
   var ai=role==='utama'?it.ai:it.aiPerbaikan;
+  var dup=role==='utama'?it.dupInfo:it.dupInfoPerbaikan;
   var label=role==='utama'?'Foto Awal':'Foto Perbaikan';
   var staged=_stagedPhotos[stagedKey(it.clId,role)];
   var html='<div class="chk-cell'+oddCls+' photo-cell" data-label="'+label+'">';
 
   if(staged){
     // Foto sudah dipilih tapi BELUM disimpan ke server -- masih bisa dibatalkan/diganti bebas.
-    html+='<img src="'+staged+'" class="photo-thumb" onclick="viewPhoto(this.src)">';
+    html+='<img src="'+staged.display+'" class="photo-thumb" onclick="viewPhoto(this.src)">';
     html+='<span class="badge badge-skip" style="margin-top:3px">Belum disimpan</span>';
     if(editable){
       html+='<div style="display:flex;gap:5px;margin-top:4px;flex-wrap:wrap">';
@@ -1000,6 +1061,7 @@ function pen_renderPhotoCell(it,role,editable,placeholderMsg,oddCls){
     if(ai && ai.failed) html+='<span class="ai-badge" style="background:#fef3c7;color:#92400e" title="'+String(ai.note||'').replace(/"/g,'&quot;')+'"><i class="fas fa-triangle-exclamation"></i>Gagal Dinilai</span>';
     else if(ai) html+='<span class="ai-badge '+(ai.result==='ok'?'ai-badge-ok':'ai-badge-nok')+'" title="'+String(ai.note||'').replace(/"/g,'&quot;')+'"><i class="fas '+(ai.result==='ok'?'fa-check':'fa-xmark')+'"></i>'+(ai.result==='ok'?'OK':'NOK')+'</span>';
     else html+='<span class="ai-badge ai-badge-pending"><i class="fas fa-spinner fa-spin"></i>Menilai...</span>';
+    if(dup) html+='<span class="ai-badge" style="background:#fef3c7;color:#92400e;margin-top:3px" title="Foto ini identik dengan foto tanggal '+dup.date+' ('+dup.shift+')"><i class="fas fa-clone"></i>Mirip foto '+dup.date+'</span>';
 
     if(ai && ai.failed && editable){
       html+='<button class="btn btn-sm btn-outline" style="margin-top:4px" onclick="retryAiForItem(\''+it.clId+'\',\''+role+'\')"><i class="fas fa-rotate-right"></i>Nilai Ulang</button>';
@@ -1068,12 +1130,32 @@ function verifyPKRes(shift){var td=todayStr();var list=DB.get('pk_result');var r
 
 var _rbY,_rbM;
 function pgRekap(){var now=new Date();if(_rbY===undefined){_rbY=now.getFullYear();_rbM=now.getMonth();}var areas=DB.get('areas');var h='<div class="card"><div class="card-header"><div class="card-title">Rekap Bulanan</div><div style="display:flex;gap:5px;align-items:center"><button class="btn btn-outline btn-sm" onclick="_rbM=(_rbM+11)%12;_rbY=_rbM===11?_rbY-1:_rbY;pgRekap()"><i class="fas fa-chevron-left"></i></button><span style="font-weight:600;font-size:11px;min-width:110px;text-align:center">'+BULAN[_rbM]+' '+_rbY+'</span><button class="btn btn-outline btn-sm" onclick="_rbM=(_rbM+1)%12;_rbY=_rbM===0?_rbY+1:_rbY;pgRekap()"><i class="fas fa-chevron-right"></i></button> <button class="btn btn-primary btn-sm" onclick="generateMonthlySummary()"><i class="fas fa-wand-magic-sparkles"></i>Ringkasan AI</button></div></div>';if(areas.length===0){h+='<div class="empty-state"><p>Belum ada area.</p></div>';}else{h+='<table><thead><tr><th>No</th><th>Area</th><th>Tipe</th><th>Skor Dasar</th><th>Inisiatif</th><th>Mystery</th><th>Kantin</th><th>Skor Akhir</th></tr></thead><tbody>';var scores=[];areas.forEach(function(a){var s=calcScore(a.id,_rbY,_rbM);if(s){scores.push(s);var bg=s.area.type==='lomba'?'':'style="background:#fffbeb"';h+='<tr '+bg+'><td>'+(scores.length)+'</td><td style="font-weight:600">'+s.area.name+'</td><td><span class="badge '+(s.area.type==='lomba'?'badge-lomba':'badge-nonlomba')+'">'+(s.area.type==='lomba'?'Lomba':'Non-Lomba')+'</span></td><td>'+s.base+'</td><td style="color:var(--primary)">+'+s.initB+'</td><td style="color:var(--danger)">-'+s.mysP+'</td><td style="color:'+(s.kantB-s.kantP>=0?'var(--primary)':'var(--danger)')+'">'+((s.kantB-s.kantP>=0?'+':'')+(s.kantB-s.kantP))+'</td><td style="font-weight:800;font-size:14px">'+s.final+'</td></tr>';}});h+='</tbody></table>';}_rbScores=scores;h+='<div id="ai-summary-box" style="margin-top:10px"></div></div>';document.getElementById('content').innerHTML=h;}
+// Hitung item checklist mana yang paling sering "Tidak OK" untuk satu area di satu bulan,
+// supaya AI (di summarize-report) punya bahan konkret untuk kasih rekomendasi tindakan,
+// bukan cuma menyimpulkan dari angka skor akhir saja.
+function aggMasalahArea(areaId,pf){
+  var cls=DB.get('checklists').filter(function(c){return c.areaId===areaId});
+  var count={};
+  getAllPenilaian().forEach(function(rec){
+    if(rec.areaId!==areaId||rec.date.substring(0,7)!==pf)return;
+    (rec.items||[]).forEach(function(it){
+      [it.ai,it.aiPerbaikan].forEach(function(ai){
+        if(ai&&!ai.failed&&ai.result==='nok')count[it.clId]=(count[it.clId]||0)+1;
+      });
+    });
+  });
+  var arr=Object.keys(count).map(function(clId){var cl=cls.find(function(c){return c.id===clId});return{item:cl?cl.desc:'(item dihapus)',cat:cl?cl.cat:'-',jumlah_nok:count[clId]};});
+  arr.sort(function(a,b){return b.jumlah_nok-a.jumlah_nok});
+  return arr.slice(0,5);
+}
 function generateMonthlySummary(){
   var box=document.getElementById('ai-summary-box');if(!box)return;
   if(!_rbScores||_rbScores.length===0){box.innerHTML='<div class="info-box">Belum ada data skor bulan ini.</div>';return;}
   box.innerHTML='<div class="info-box info-warn"><i class="fas fa-spinner fa-spin"></i> AI sedang menyusun ringkasan...</div>';
-  var payload=_rbScores.map(function(s){return{nama:s.area.name,tipe:s.area.type,skor_dasar:s.base,skor_akhir:s.final};});
-  fetch(SUPABASE_URL+'/functions/v1/summarize-report',{method:'POST',headers:sbHeaders(),body:JSON.stringify({bulan:BULAN[_rbM]+' '+_rbY,scores:payload})})
+  var pf=mPrefix(_rbY,_rbM);
+  var payload=_rbScores.map(function(s){return{nama:s.area.name,tipe:s.area.type,skor_dasar:s.base,skor_akhir:s.final,hari_aktif:s.activeDays,skor_per_hari:s.perHari,item_paling_sering_nok:aggMasalahArea(s.area.id,pf)};});
+  var instruksi='Buat ringkasan performa 5R bulan ini, LALU sertakan juga bagian terpisah berisi rekomendasi tindakan konkret (action item) untuk tiap area yang punya item_paling_sering_nok, dengan format: nama area - item bermasalah - saran tindakan (mis. retraining, ganti standar, perbaikan fasilitas).';
+  fetch(SUPABASE_URL+'/functions/v1/summarize-report',{method:'POST',headers:sbHeaders(),body:JSON.stringify({bulan:BULAN[_rbM]+' '+_rbY,scores:payload,instruksi:instruksi})})
     .then(function(r){return r.json();})
     .then(function(data){
       if(data.error){box.innerHTML='<div class="info-box" style="color:var(--danger)">Gagal membuat ringkasan: '+data.error+'</div>';return;}
@@ -1081,13 +1163,72 @@ function generateMonthlySummary(){
     }).catch(function(e){box.innerHTML='<div class="info-box" style="color:var(--danger)">Gagal terhubung ke AI.</div>';});
 }
 
-var _klY,_klM;
-function pgKlasemen(){var now=new Date();if(_klY===undefined){_klY=now.getFullYear();_klM=now.getMonth();}var areas=DB.get('areas').filter(function(a){return a.type==='lomba'});var scores=[];areas.forEach(function(a){var s=calcScore(a.id,_klY,_klM);if(s)scores.push(s);});scores.sort(function(a,b){return b.final-a.final});var h='<div class="card"><div class="card-header"><div class="card-title">Klasemen Lomba 5R</div><div style="display:flex;gap:5px;align-items:center"><button class="btn btn-outline btn-sm" onclick="_klM=(_klM+11)%12;_klY=_klM===11?_klY-1:_klY;pgKlasemen()"><i class="fas fa-chevron-left"></i></button><span style="font-weight:600;font-size:11px;min-width:110px;text-align:center">'+BULAN[_klM]+' '+_klY+'</span><button class="btn btn-outline btn-sm" onclick="_klM=(_klM+1)%12;_klY=_klM===0?_klY+1:_klY;pgKlasemen()"><i class="fas fa-chevron-right"></i></button></div></div>';if(scores.length<3){h+='<div class="empty-state"><i class="fas fa-trophy"></i><p>Minimal 3 area lomba dengan data penilaian untuk menampilkan podium.</p></div>';}else{h+='<div class="podium">';for(var i=0;i<3;i++){h+='<div class="podium-item podium-'+(i+1)+'"><div class="podium-bar">'+(i+1)+'</div><div class="podium-label">'+scores[i].area.name+'<br><small>('+scores[i].final+')</small></div></div>';}h+='</div>';}h+='<table style="margin-top:15px"><thead><tr><th>Peringkat</th><th>Area</th><th>Skor Akhir</th></tr></thead><tbody>';scores.forEach(function(s,i){h+='<tr><td style="font-weight:800">'+(i+1)+'</td><td style="font-weight:600">'+s.area.name+'</td><td style="font-weight:800;color:var(--primary)">'+s.final+'</td></tr>';});h+='</tbody></table></div>';document.getElementById('content').innerHTML=h;}
+var _klY,_klM,_klMode;
+function pgKlasemen(){var now=new Date();if(_klY===undefined){_klY=now.getFullYear();_klM=now.getMonth();}if(_klMode===undefined)_klMode='perhari';var areas=DB.get('areas').filter(function(a){return a.type==='lomba'});var scores=[];areas.forEach(function(a){var s=calcScore(a.id,_klY,_klM);if(s)scores.push(s);});var sortKey=_klMode==='perhari'?'perHari':'final';scores.sort(function(a,b){return b[sortKey]-a[sortKey]});var h='<div class="card"><div class="card-header"><div class="card-title">Klasemen Lomba 5R</div><div style="display:flex;gap:5px;align-items:center"><button class="btn btn-outline btn-sm" onclick="_klM=(_klM+11)%12;_klY=_klM===11?_klY-1:_klY;pgKlasemen()"><i class="fas fa-chevron-left"></i></button><span style="font-weight:600;font-size:11px;min-width:110px;text-align:center">'+BULAN[_klM]+' '+_klY+'</span><button class="btn btn-outline btn-sm" onclick="_klM=(_klM+1)%12;_klY=_klM===0?_klY+1:_klY;pgKlasemen()"><i class="fas fa-chevron-right"></i></button></div></div>';h+='<div class="info-box info-ok" style="margin-bottom:12px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px"><span><i class="fas fa-circle-info"></i> Karena skor bulanan bersifat akumulatif, area yang mulai dinilai lebih awal wajar punya skor mentah lebih tinggi/rendah. Gunakan mode <strong>Skor/Hari</strong> untuk perbandingan yang adil antar area.</span><div style="display:flex;gap:4px;flex-shrink:0"><button class="btn btn-sm '+(_klMode==='perhari'?'btn-primary':'btn-outline')+'" onclick="_klMode=\'perhari\';pgKlasemen()">Skor/Hari</button><button class="btn btn-sm '+(_klMode==='akumulatif'?'btn-primary':'btn-outline')+'" onclick="_klMode=\'akumulatif\';pgKlasemen()">Akumulatif</button></div></div>';if(scores.length<3){h+='<div class="empty-state"><i class="fas fa-trophy"></i><p>Minimal 3 area lomba dengan data penilaian untuk menampilkan podium.</p></div>';}else{h+='<div class="podium">';for(var i=0;i<3;i++){h+='<div class="podium-item podium-'+(i+1)+'"><div class="podium-bar">'+(i+1)+'</div><div class="podium-label">'+scores[i].area.name+'<br><small>('+scores[i][sortKey]+')</small></div></div>';}h+='</div>';}h+='<table style="margin-top:15px"><thead><tr><th>Peringkat</th><th>Area</th><th>Hari Aktif</th><th>Skor Akumulatif</th><th>Skor/Hari</th></tr></thead><tbody>';scores.forEach(function(s,i){h+='<tr'+(i===0?' style="background:#fffbeb"':'')+'><td style="font-weight:800">'+(i+1)+'</td><td style="font-weight:600">'+s.area.name+'</td><td>'+s.activeDays+'</td><td style="'+(_klMode==='akumulatif'?'font-weight:800;color:var(--primary)':'')+'">'+s.final+'</td><td style="'+(_klMode==='perhari'?'font-weight:800;color:var(--primary)':'')+'">'+s.perHari+'</td></tr>';});h+='</tbody></table></div>';document.getElementById('content').innerHTML=h;}
 
 // CATATAN: Fungsi auto-tutup Pengawas (autoCloseMissedPengawas) sudah TIDAK DIPAKAI lagi --
 // approval manual Pengawas dihapus. Status & poin tiap item sekarang murni dihitung otomatis
 // dari jam saat ini dibanding Master Jam Penilaian (lihat pen_computeStatus), tanpa perlu
 // proses "tutup paksa" terpisah.
+
+// --- Log Keputusan AI: audit trail permanen lintas waktu, dibaca dari record penilaian ---
+// yang memang sudah tersimpan per Area+Tanggal+Shift (tidak butuh struktur data baru).
+var _laArea,_laFrom,_laTo,_laResult;
+function pgLogAI(){
+  var areas=DB.get('areas');var cls=DB.get('checklists');
+  if(_laArea===undefined)_laArea='';
+  if(_laFrom===undefined)_laFrom='';
+  if(_laTo===undefined)_laTo='';
+  if(_laResult===undefined)_laResult='';
+  var rows=[];
+  getAllPenilaian().forEach(function(rec){
+    if(_laArea&&rec.areaId!==_laArea)return;
+    if(_laFrom&&rec.date<_laFrom)return;
+    if(_laTo&&rec.date>_laTo)return;
+    var area=areas.find(function(a){return a.id===rec.areaId});
+    (rec.items||[]).forEach(function(it){
+      [['utama',it.photo,it.ai,it.dupInfo],['perbaikan',it.photoPerbaikan,it.aiPerbaikan,it.dupInfoPerbaikan]].forEach(function(p){
+        var role=p[0],photo=p[1],ai=p[2],dup=p[3];
+        if(!ai)return;
+        var isGagal=!!ai.failed;
+        var matchResult=true;
+        if(_laResult==='gagal')matchResult=isGagal;
+        else if(_laResult)matchResult=(!isGagal&&ai.result===_laResult);
+        if(!matchResult)return;
+        var cl=cls.find(function(c){return c.id===it.clId});
+        rows.push({date:rec.date,shift:rec.shift,areaName:area?area.name:'-',itemDesc:cl?cl.desc:'(item dihapus)',role:role,ai:ai,dup:dup,photo:photo,ts:ai.ts||0});
+      });
+    });
+  });
+  rows.sort(function(a,b){return b.ts-a.ts});
+  var LIMIT=300;var total=rows.length;var shown=rows.slice(0,LIMIT);
+  var h='<div class="card"><div class="card-header"><div class="card-title">Log Keputusan AI</div></div>';
+  h+='<div class="info-box info-ok" style="margin-bottom:12px"><i class="fas fa-circle-info"></i> Riwayat permanen setiap keputusan AI (OK/Tidak OK/Gagal) beserta alasannya, untuk ditelusuri kalau ada yang komplain soal skor.</div>';
+  h+='<div style="display:flex;gap:8px;align-items:end;flex-wrap:wrap;margin-bottom:12px">';
+  h+='<div class="form-group" style="margin:0;min-width:160px"><label class="form-label">Area</label><select class="form-select" id="la-area" onchange="_laArea=this.value;pgLogAI()"><option value="">Semua Area</option>';
+  areas.forEach(function(a){h+='<option value="'+a.id+'"'+(a.id===_laArea?' selected':'')+'>'+a.name+'</option>';});
+  h+='</select></div>';
+  h+='<div class="form-group" style="margin:0"><label class="form-label">Dari Tanggal</label><input type="date" class="form-input" id="la-from" value="'+_laFrom+'" onchange="_laFrom=this.value;pgLogAI()"></div>';
+  h+='<div class="form-group" style="margin:0"><label class="form-label">Sampai Tanggal</label><input type="date" class="form-input" id="la-to" value="'+_laTo+'" onchange="_laTo=this.value;pgLogAI()"></div>';
+  h+='<div class="form-group" style="margin:0;min-width:140px"><label class="form-label">Hasil AI</label><select class="form-select" id="la-result" onchange="_laResult=this.value;pgLogAI()">';
+  [['','Semua'],['ok','OK'],['nok','Tidak OK'],['gagal','Gagal Dinilai']].forEach(function(o){h+='<option value="'+o[0]+'"'+(o[0]===_laResult?' selected':'')+'>'+o[1]+'</option>';});
+  h+='</select></div>';
+  if(_laArea||_laFrom||_laTo||_laResult)h+='<button class="btn btn-outline btn-sm" onclick="_laArea=\'\';_laFrom=\'\';_laTo=\'\';_laResult=\'\';pgLogAI()"><i class="fas fa-rotate-left"></i>Reset</button>';
+  h+='</div>';
+  if(shown.length===0){h+='<div class="empty-state"><i class="fas fa-magnifying-glass-chart"></i><p>Tidak ada log yang cocok dengan filter.</p></div>';}
+  else{
+    if(total>LIMIT)h+='<div class="info-box info-warn" style="margin-bottom:8px"><i class="fas fa-triangle-exclamation"></i> Menampilkan '+LIMIT+' dari '+total+' log terbaru. Persempit filter tanggal/area untuk melihat yang lain.</div>';
+    h+='<table><thead><tr><th>Tanggal</th><th>Shift</th><th>Area</th><th>Item Checklist</th><th>Jenis Foto</th><th>Foto</th><th>Hasil AI</th><th>Catatan AI</th><th>Duplikat?</th></tr></thead><tbody>';
+    shown.forEach(function(r){
+      var badge=r.ai.failed?'<span class="ai-badge" style="background:#fef3c7;color:#92400e"><i class="fas fa-triangle-exclamation"></i>Gagal</span>':'<span class="ai-badge '+(r.ai.result==='ok'?'ai-badge-ok':'ai-badge-nok')+'"><i class="fas '+(r.ai.result==='ok'?'fa-check':'fa-xmark')+'"></i>'+(r.ai.result==='ok'?'OK':'NOK')+'</span>';
+      var dupHtml=r.dup?'<span class="ai-badge" style="background:#fef3c7;color:#92400e" title="Mirip foto tanggal '+r.dup.date+' ('+r.dup.shift+')"><i class="fas fa-clone"></i>Mirip '+r.dup.date+'</span>':'<span style="font-size:10px;color:var(--text-muted)">-</span>';
+      h+='<tr><td>'+fmtD(r.date)+'</td><td>'+(r.shift==='pagi'?'Pagi':'Siang')+'</td><td style="font-weight:600">'+r.areaName+'</td><td style="max-width:220px">'+r.itemDesc+'</td><td>'+(r.role==='utama'?'Foto Awal':'Foto Perbaikan')+'</td><td>'+(r.photo?'<img src="'+r.photo+'" class="photo-thumb" style="width:40px;height:40px" onclick="viewPhoto(this.src)">':'-')+'</td><td>'+badge+'</td><td style="max-width:260px;font-size:11px">'+(r.ai.note||'-')+'</td><td>'+dupHtml+'</td></tr>';
+    });
+    h+='</tbody></table>';
+  }
+  h+='</div>';
+  document.getElementById('content').innerHTML=h;
+}
 
 // Migrasi satu kali: pindahkan data lama (key tunggal 'penilaian' berisi array besar)
 // ke format baru (satu key per record). Aman dijalankan berkali-kali -- kalau data lama
